@@ -1,51 +1,83 @@
-/* Session Script — observer logger
-   Works standalone (file:// or any static host) and with the optional local server. */
+/* Session Script — segment timer for observers.
+   Stays on the phone (localStorage). Optional server.py can still collect files.
+   The activity time is taken when the activity is chosen, not when a dialog opens. */
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "session-script-v1";
-  var DEFAULT_EMAIL = "maarten.vanneste@meetingsupport.org";
-  var OTHER_TYPE = "Other activity";
+  var STORAGE_KEY = "session-script-v2";
+  var LEGACY_KEY = "session-script-v1";
+  var COORDINATOR = "maarten.vanneste@meetingsupport.org";
+  var DOUBLE_TAP_MS = 2000;
 
   var ACTIVITY_TYPES = [
     "Introduction",
-    "Presentations",
-    "Question from a participant",
+    "Presentation",
     "Conversation",
-    "Voting",
-    "Play/Sing",
-    "Other activity",
     "Q&A",
-    "Conclusions",
-    "Survey"
+    "Participant question",
+    "Survey",
+    "Drawing",
+    "Other activity"
   ];
 
-  var state = defaultState();
-  var pendingIso = null;
-  var pendingType = null;
-  var editingId = null;
+  var BUCKETS = [
+    { id: "presentation", label: "Presentation (incl. introduction)", types: ["Introduction", "Presentation"] },
+    { id: "conversation", label: "Conversation", types: ["Conversation"] },
+    { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
+    { id: "survey", label: "Survey", types: ["Survey"] },
+    { id: "drawing", label: "Drawing", types: ["Drawing"] },
+    { id: "other", label: "Other", types: ["Other activity"] }
+  ];
+
+  var CLOSING_OPTIONS = [
+    "People left right away",
+    "People stayed talking",
+    "Mixed",
+    "Other"
+  ];
+
+  var CSV_HEADERS = [
+    "session",
+    "observer",
+    "room_speakers",
+    "segment_type",
+    "start",
+    "end",
+    "duration_seconds",
+    "group_size",
+    "note"
+  ];
+
+  var LEGACY_TYPES = {
+    "Introduction": "Introduction",
+    "Presentations": "Presentation",
+    "Presentation": "Presentation",
+    "Question from a participant": "Participant question",
+    "Participant question": "Participant question",
+    "Conversation": "Conversation",
+    "Q&A": "Q&A",
+    "Survey": "Survey",
+    "Drawing": "Drawing",
+    "Other activity": "Other activity"
+  };
+
+  var state = { version: 2, currentId: null, screen: null, sessions: [] };
+  var exportNote = { text: "", error: false };
   var serverAvailable = false;
   var lastFocused = null;
+  var lastTap = { type: "", at: 0 };
+  var pendingOtherAt = null;
+  var editingId = null;
+  var deletingId = null;
 
   var $ = function (id) { return document.getElementById(id); };
 
-  function defaultState() {
-    return {
-      version: 1,
-      setup: {
-        title: "",
-        speakers: "",
-        plannedStart: toDatetimeLocal(new Date()),
-        observer: ""
-      },
-      settings: {
-        coordinatorEmail: DEFAULT_EMAIL
-      },
-      activities: []
-    };
-  }
-
   function pad(n) { return String(n).padStart(2, "0"); }
+
+  function uid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
 
   function toDatetimeLocal(d) {
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
@@ -70,9 +102,22 @@
     return pad(d.getHours()) + ":" + pad(d.getMinutes());
   }
 
+  function formatStamp(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+
   function formatDateLong(d) {
     try {
       return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    } catch (e) {
+      return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    }
+  }
+
+  function formatDateShort(d) {
+    try {
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     } catch (e) {
       return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
     }
@@ -82,28 +127,32 @@
     return String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate());
   }
 
-  function minutesBetween(from, to) {
-    return Math.round((to.getTime() - from.getTime()) / 60000);
+  function formatSeconds(total) {
+    total = Math.round(Number(total) || 0);
+    if (total < 0) total = 0;
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+    if (h > 0 && m > 0) return h + " h " + m + " min";
+    if (h > 0) return h + " h";
+    if (m > 0 && s > 0) return m + " min " + s + " s";
+    if (m > 0) return m + " min";
+    return s + " s";
   }
 
-  function formatElapsed(mins) {
-    if (!isFinite(mins)) return "—";
-    if (mins === 0) return "+0 min";
-    return (mins > 0 ? "+" : "") + mins + " min";
+  function formatElapsed(startIso) {
+    var ms = Date.now() - new Date(startIso).getTime();
+    if (!isFinite(ms) || ms < 0) ms = 0;
+    var total = Math.floor(ms / 1000);
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+    if (h > 0) return h + ":" + pad(m) + ":" + pad(s);
+    return pad(m) + ":" + pad(s);
   }
 
-  function formatDuration(ms) {
-    if (ms == null || ms < 0) return "—";
-    if (ms < 60000) return "less than 1 min";
-    var total = Math.round(ms / 60000);
-    var h = Math.floor(total / 60);
-    var m = total % 60;
-    if (h <= 0) return m + " min";
-    return h + " h " + m + " min";
-  }
-
-  function slugPart(s, fallback) {
-    var t = String(s || "")
+  function slugPart(value, fallback) {
+    var t = String(value || "")
       .trim()
       .replace(/[^\w\s-]+/g, "")
       .replace(/\s+/g, "-")
@@ -114,223 +163,536 @@
     return t || fallback;
   }
 
-  function reportDate() {
-    var planned = parseDatetimeLocal(state.setup.plannedStart);
-    if (planned) return planned;
-    if (state.activities.length) return new Date(state.activities[0].time);
-    return new Date();
-  }
-
-  function reportFilename() {
-    var d = reportDate();
-    var title = slugPart(state.setup.title, "session");
-    var observer = slugPart(state.setup.observer, "observer");
-    return yymmdd(d) + " " + title + " " + observer + ".txt";
-  }
-
-  function sortedActivities() {
-    return state.activities.slice().sort(function (a, b) {
-      return new Date(a.time).getTime() - new Date(b.time).getTime();
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
     });
   }
 
-  function actualStartDate() {
-    var list = sortedActivities();
-    return list.length ? new Date(list[0].time) : null;
+  function wantsGroup(type) {
+    return type === "Conversation" || type === "Other activity";
   }
 
-  function endDate() {
-    var list = sortedActivities();
-    return list.length ? new Date(list[list.length - 1].time) : null;
+  function parseGroupSize(value) {
+    if (value == null) return null;
+    var text = String(value).trim();
+    if (!text) return null;
+    var n = Number(text);
+    if (!isFinite(n) || n < 1) return null;
+    n = Math.round(n);
+    if (n > 999) n = 999;
+    return n;
   }
 
-  function speakersLine() {
-    return (state.setup.speakers || "")
-      .split(/\r?\n/)
-      .map(function (s) { return s.trim(); })
-      .filter(Boolean)
-      .join(", ");
+  function blankSession(observer) {
+    var now = new Date();
+    return {
+      id: uid(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      title: "",
+      speakers: "",
+      plannedStart: toDatetimeLocal(now),
+      observer: observer || "",
+      status: "setup",
+      segments: [],
+      closing: null,
+      endedAt: null,
+      lastFiles: null,
+      dirtyExport: false
+    };
   }
 
-  function activityLabel(entry) {
-    if (entry.type === OTHER_TYPE && entry.other) return OTHER_TYPE + ": " + entry.other;
-    return entry.type;
-  }
-
-  function activityLine(entry) {
-    var t = new Date(entry.time);
-    var planned = parseDatetimeLocal(state.setup.plannedStart);
-    var elapsed = planned ? formatElapsed(minutesBetween(planned, t)) : "";
-    var line = formatHMS(t) + (elapsed ? " (" + elapsed + ") " : " ") + activityLabel(entry);
-    if (entry.note) {
-      if (entry.type === OTHER_TYPE && entry.other) line += " — " + entry.note;
-      else line += ": " + entry.note;
+  function findSession(id) {
+    if (!id) return null;
+    for (var i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === id) return state.sessions[i];
     }
-    return line;
+    return null;
   }
 
-  function buildReport() {
-    var planned = parseDatetimeLocal(state.setup.plannedStart);
-    var actual = actualStartDate();
-    var end = endDate();
-    var duration = (actual && end) ? formatDuration(end.getTime() - actual.getTime()) : "—";
+  function currentSession() {
+    return findSession(state.currentId);
+  }
+
+  function findSegment(session, id) {
+    if (!session) return null;
+    for (var i = 0; i < session.segments.length; i++) {
+      if (session.segments[i].id === id) return session.segments[i];
+    }
+    return null;
+  }
+
+  function runningSegment(session) {
+    if (!session || session.status === "ended") return null;
+    for (var i = session.segments.length - 1; i >= 0; i--) {
+      if (!session.segments[i].end) return session.segments[i];
+    }
+    return null;
+  }
+
+  function orderedSegments(session) {
+    return session.segments.slice().sort(function (a, b) {
+      return new Date(a.start).getTime() - new Date(b.start).getTime();
+    });
+  }
+
+  function isBlank(session) {
+    if (!session || session.status === "ended") return false;
+    if (session.segments.length) return false;
+    if ((session.title || "").trim()) return false;
+    if ((session.speakers || "").trim()) return false;
+    if (session.closing) return false;
+    return true;
+  }
+
+  function isListed(session) {
+    if (!session || isBlank(session)) return false;
+    if (session.status === "ended") return true;
+    if (session.segments.length) return true;
+    return !!(session.title || "").trim();
+  }
+
+  function lastObserver() {
+    for (var i = state.sessions.length - 1; i >= 0; i--) {
+      var name = (state.sessions[i].observer || "").trim();
+      if (name) return name;
+    }
+    return "";
+  }
+
+  function speakersList(session) {
+    return String(session.speakers || "")
+      .split(/\r?\n/)
+      .map(function (line) { return line.trim(); })
+      .filter(Boolean);
+  }
+
+  function segmentSeconds(seg) {
+    if (!seg || !seg.start || !seg.end) return null;
+    var ms = new Date(seg.end).getTime() - new Date(seg.start).getTime();
+    if (!isFinite(ms)) return null;
+    return ms < 0 ? 0 : Math.round(ms / 1000);
+  }
+
+  function sessionSeconds(session) {
+    var total = 0;
+    session.segments.forEach(function (seg) {
+      if (seg.end) {
+        var secs = segmentSeconds(seg);
+        if (secs != null) total += secs;
+      } else if (session.status !== "ended") {
+        var ms = Date.now() - new Date(seg.start).getTime();
+        if (ms > 0) total += Math.round(ms / 1000);
+      }
+    });
+    return total;
+  }
+
+  function sessionDate(session) {
+    var planned = parseDatetimeLocal(session.plannedStart);
+    if (planned) return planned;
+    if (session.segments.length) return new Date(session.segments[0].start);
+    return new Date(session.createdAt || Date.now());
+  }
+
+  function bucketIdFor(type) {
+    for (var i = 0; i < BUCKETS.length; i++) {
+      if (BUCKETS[i].types.indexOf(type) !== -1) return BUCKETS[i].id;
+    }
+    return "other";
+  }
+
+  function shareTenths(parts, total) {
+    var zeros = parts.map(function () { return 0; });
+    if (!total) return zeros;
+    var floors = [];
+    var fracs = [];
+    var used = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var exact = (parts[i] * 1000) / total;
+      var base = Math.floor(exact);
+      floors.push(base);
+      fracs.push(exact - base);
+      used += base;
+    }
+    var left = 1000 - used;
+    var order = fracs.map(function (frac, index) {
+      return { i: index, f: frac, p: parts[index] };
+    });
+    order.sort(function (a, b) {
+      if (b.f !== a.f) return b.f - a.f;
+      return b.p - a.p;
+    });
+    var guard = 0;
+    while (left > 0 && order.length && guard < 5000) {
+      floors[order[guard % order.length].i] += 1;
+      left -= 1;
+      guard += 1;
+    }
+    guard = 0;
+    while (left < 0 && order.length && guard < 5000) {
+      var idx = order[order.length - 1 - (guard % order.length)].i;
+      if (floors[idx] > 0) {
+        floors[idx] -= 1;
+        left += 1;
+      }
+      guard += 1;
+    }
+    return floors;
+  }
+
+  function computeTotals(session) {
+    var byId = {};
+    BUCKETS.forEach(function (bucket) { byId[bucket.id] = 0; });
+    var total = 0;
+    var groups = [];
+    session.segments.forEach(function (seg) {
+      var secs = segmentSeconds(seg);
+      if (secs == null) return;
+      byId[bucketIdFor(seg.type)] += secs;
+      total += secs;
+      if (seg.groupSize != null) groups.push(seg.groupSize);
+    });
+    var parts = BUCKETS.map(function (bucket) { return byId[bucket.id]; });
+    var tenths = shareTenths(parts, total);
+    var average = null;
+    if (groups.length) {
+      var sum = groups.reduce(function (acc, n) { return acc + n; }, 0);
+      average = sum / groups.length;
+    }
+    return {
+      totalSeconds: total,
+      averageGroup: average,
+      buckets: BUCKETS.map(function (bucket, index) {
+        return {
+          id: bucket.id,
+          label: bucket.label,
+          seconds: byId[bucket.id],
+          tenths: tenths[index]
+        };
+      })
+    };
+  }
+
+  function formatAvg(value) {
+    if (value == null || !isFinite(value)) return null;
+    var rounded = Math.round(value * 100) / 100;
+    if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+    return String(rounded);
+  }
+
+  function segmentLabel(seg) {
+    if (seg.type === "Other activity" && (seg.otherLabel || "").trim()) {
+      return "Other activity: " + seg.otherLabel.trim();
+    }
+    return seg.type;
+  }
+
+  function exportNoteText(seg) {
+    var label = (seg.otherLabel || "").trim();
+    var note = (seg.note || "").trim();
+    if (seg.type === "Other activity" && label && note) return label + " - " + note;
+    if (seg.type === "Other activity" && label) return label;
+    return note;
+  }
+
+  function fileBase(session) {
+    var when = parseDatetimeLocal(session.plannedStart);
+    if (!when && session.segments.length) when = new Date(session.segments[0].start);
+    if (!when) when = new Date();
+    return yymmdd(when) + " " + slugPart(session.title, "session") + " " + slugPart(session.observer, "observer");
+  }
+
+  function csvCell(value) {
+    var text = value == null ? "" : String(value);
+    if (/^[=+\-@\t]/.test(text)) text = "'" + text;
+    if (/[",\r\n]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+    return text;
+  }
+
+  function buildCsv(session) {
+    var room = speakersList(session).join("; ");
+    var lines = [CSV_HEADERS.join(",")];
+    orderedSegments(session).forEach(function (seg) {
+      var secs = segmentSeconds(seg);
+      lines.push([
+        csvCell(session.title || ""),
+        csvCell(session.observer || ""),
+        csvCell(room),
+        csvCell(seg.type),
+        csvCell(seg.start ? formatStamp(new Date(seg.start)) : ""),
+        csvCell(seg.end ? formatStamp(new Date(seg.end)) : ""),
+        secs == null ? "" : String(secs),
+        seg.groupSize == null ? "" : String(seg.groupSize),
+        csvCell(exportNoteText(seg))
+      ].join(","));
+    });
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  function segmentScriptLine(seg) {
+    var start = formatHMS(new Date(seg.start));
+    var extra = seg.groupSize ? " · group size " + seg.groupSize : "";
+    var label = segmentLabel(seg);
+    if (!seg.end) return start + " (running) " + label + extra;
+    var secs = segmentSeconds(seg);
+    return start + "–" + formatHMS(new Date(seg.end)) + " (" + formatSeconds(secs) + ") " + label + extra;
+  }
+
+  function closingAnswerText(session) {
+    if (!session.closing) return "—";
+    if (session.closing.answer === "Other") return "Other — " + (session.closing.otherText || "");
+    return session.closing.answer;
+  }
+
+  function buildReport(session) {
+    var planned = parseDatetimeLocal(session.plannedStart);
+    var segs = orderedSegments(session);
+    var first = segs.length ? new Date(segs[0].start) : null;
+    var lastEnd = null;
+    for (var i = segs.length - 1; i >= 0; i--) {
+      if (segs[i].end) {
+        lastEnd = new Date(segs[i].end);
+        break;
+      }
+    }
+    var totals = computeTotals(session);
     var lines = [
       "SESSION SCRIPT",
       "Meeting Design Institute",
       "",
-      "Session: " + (state.setup.title || "—"),
-      "Speakers: " + (speakersLine() || "—"),
-      "Observer: " + (state.setup.observer || "—"),
-      "Date: " + formatDateLong(reportDate()),
+      "Session: " + (session.title || "—"),
+      "Speakers: " + (speakersList(session).join(", ") || "—"),
+      "Observer: " + (session.observer || "—"),
+      "Date: " + formatDateLong(planned || first || new Date(session.createdAt || Date.now())),
       "Planned start: " + (planned ? formatHM(planned) : "—"),
-      "Actual start: " + (actual ? formatHMS(actual) : "—"),
-      "End: " + (end ? formatHMS(end) : "—"),
-      "Duration: " + duration,
+      "Actual start: " + (first ? formatHMS(first) : "—"),
+      "End: " + (lastEnd ? formatHMS(lastEnd) : "—"),
+      "Duration: " + (totals.totalSeconds ? formatSeconds(totals.totalSeconds) : "—"),
       "",
-      "----------------------------------------------------------------"
+      "After the closing announcement: " + closingAnswerText(session)
     ];
-    var list = sortedActivities();
-    if (!list.length) {
-      lines.push("(no activities logged)");
+    if (session.closing && session.closing.comment) lines.push("Comment: " + session.closing.comment);
+    lines.push("", "TOTALS");
+    totals.buckets.forEach(function (bucket) {
+      var shown = bucket.seconds === 0 ? "0 min" : formatSeconds(bucket.seconds);
+      lines.push(bucket.label + ": " + shown + " (" + (bucket.tenths / 10).toFixed(1) + "%)");
+    });
+    lines.push("Average group size: " + (formatAvg(totals.averageGroup) || "—"));
+    lines.push("", "SEGMENTS");
+    if (!segs.length) {
+      lines.push("(no segments)");
     } else {
-      list.forEach(function (entry) { lines.push(activityLine(entry)); });
+      segs.forEach(function (seg) {
+        lines.push(segmentScriptLine(seg));
+        if ((seg.note || "").trim()) lines.push("  " + seg.note.trim());
+      });
     }
-    lines.push("----------------------------------------------------------------");
     lines.push("");
     return lines.join("\n");
+  }
+
+  function makeFile(name, contents, mime) {
+    try {
+      return new File([contents], name, { type: mime });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildFiles(session) {
+    var base = fileBase(session);
+    var txtName = base + ".txt";
+    var csvName = base + ".csv";
+    var txt = buildReport(session);
+    var csv = buildCsv(session);
+    return {
+      txtName: txtName,
+      csvName: csvName,
+      txt: txt,
+      csv: csv,
+      txtFile: makeFile(txtName, txt, "text/plain"),
+      csvFile: makeFile(csvName, "\ufeff" + csv, "text/csv")
+    };
+  }
+
+  function normalizeSegment(raw) {
+    if (!raw || typeof raw !== "object" || !raw.start) return null;
+    var type = ACTIVITY_TYPES.indexOf(raw.type) === -1 ? "Other activity" : raw.type;
+    var otherLabel = (raw.otherLabel || "").trim();
+    if (type === "Other activity" && raw.type !== "Other activity" && !otherLabel) otherLabel = String(raw.type || "");
+    return {
+      id: raw.id || uid(),
+      type: type,
+      otherLabel: otherLabel,
+      start: raw.start,
+      end: raw.end || null,
+      note: raw.note || "",
+      groupSize: parseGroupSize(raw.groupSize)
+    };
+  }
+
+  function normalizeClosing(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    if (CLOSING_OPTIONS.indexOf(raw.answer) === -1) return null;
+    var otherText = String(raw.otherText || "").trim();
+    if (raw.answer === "Other" && !otherText) return null;
+    return {
+      answer: raw.answer,
+      otherText: raw.answer === "Other" ? otherText : "",
+      comment: String(raw.comment || "").trim()
+    };
+  }
+
+  function normalizeSession(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var session = blankSession("");
+    session.id = raw.id || session.id;
+    session.createdAt = raw.createdAt || session.createdAt;
+    session.updatedAt = raw.updatedAt || session.updatedAt;
+    session.title = raw.title || "";
+    session.speakers = raw.speakers || "";
+    session.plannedStart = raw.plannedStart || session.plannedStart;
+    session.observer = raw.observer || "";
+    session.status = raw.status === "ended" || raw.status === "live" ? raw.status : "setup";
+    session.segments = Array.isArray(raw.segments) ? raw.segments.map(normalizeSegment).filter(Boolean) : [];
+    session.closing = normalizeClosing(raw.closing);
+    session.endedAt = raw.endedAt || null;
+    session.lastFiles = raw.lastFiles && raw.lastFiles.txtName ? raw.lastFiles : null;
+    session.dirtyExport = !!raw.dirtyExport;
+    return session;
+  }
+
+  function repairRunning(session) {
+    if (session.status === "ended") {
+      var end = session.endedAt || new Date().toISOString();
+      session.segments.forEach(function (seg) {
+        if (!seg.end) seg.end = end;
+      });
+      return;
+    }
+    var open = session.segments.filter(function (seg) { return !seg.end; });
+    if (open.length <= 1) return;
+    open.sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    for (var i = 0; i < open.length - 1; i++) open[i].end = open[i + 1].start;
+  }
+
+  function sessionFromLegacy(data) {
+    var setup = data.setup || {};
+    var activities = Array.isArray(data.activities) ? data.activities.slice() : [];
+    activities.sort(function (a, b) { return new Date(a.time) - new Date(b.time); });
+    if (!activities.length && !(setup.title || "").trim()) return null;
+    var session = blankSession(setup.observer || "");
+    session.title = setup.title || "";
+    session.speakers = setup.speakers || "";
+    session.plannedStart = setup.plannedStart || session.plannedStart;
+    session.status = activities.length ? "live" : "setup";
+    activities.forEach(function (activity, index) {
+      var mapped = LEGACY_TYPES[activity.type];
+      var type = mapped || "Other activity";
+      var otherLabel = "";
+      if (type === "Other activity") {
+        otherLabel = String(activity.other || "").trim();
+        if (!otherLabel && !mapped) otherLabel = String(activity.type || "Other");
+      }
+      var next = activities[index + 1];
+      session.segments.push({
+        id: activity.id || uid(),
+        type: type,
+        otherLabel: otherLabel,
+        start: activity.time,
+        end: next ? next.time : null,
+        note: activity.note || "",
+        groupSize: null
+      });
+    });
+    session.updatedAt = new Date().toISOString();
+    return session;
   }
 
   function load() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && Array.isArray(data.sessions)) {
+          state.sessions = data.sessions.map(normalizeSession).filter(Boolean);
+          state.currentId = data.currentId || null;
+          if (!findSession(state.currentId)) state.currentId = null;
+          state.sessions.forEach(repairRunning);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load Session Script", e);
+    }
+    migrateLegacy();
+  }
+
+  function migrateLegacy() {
+    try {
+      var raw = localStorage.getItem(LEGACY_KEY);
       if (!raw) return;
       var data = JSON.parse(raw);
-      if (!data || typeof data !== "object") return;
-      state.setup = Object.assign(state.setup, data.setup || {});
-      state.settings = Object.assign(state.settings, data.settings || {});
-      state.activities = Array.isArray(data.activities) ? data.activities : [];
-      if (!state.settings.coordinatorEmail) state.settings.coordinatorEmail = DEFAULT_EMAIL;
-      if (!state.setup.plannedStart) state.setup.plannedStart = toDatetimeLocal(new Date());
+      var session = sessionFromLegacy(data || {});
+      if (!session) return;
+      state.sessions = [session];
+      state.currentId = session.id;
+      save();
     } catch (e) {
-      console.warn("Could not load saved session", e);
+      console.warn("Could not migrate the previous session", e);
     }
   }
 
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 2,
+        currentId: state.currentId,
+        sessions: state.sessions
+      }));
     } catch (e) {
-      toast("Could not save on this device");
+      toast("Could not save on this phone");
     }
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
-    });
-  }
-
-  function uid() {
-    if (crypto && crypto.randomUUID) return crypto.randomUUID();
-    return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
-  }
-
-  function readSetupFromForm() {
-    state.setup.title = $("sessionTitle").value;
-    state.setup.speakers = $("speakers").value;
-    state.setup.plannedStart = $("plannedStart").value;
-    state.setup.observer = $("observer").value;
-  }
-
-  function fillForm() {
-    $("sessionTitle").value = state.setup.title || "";
-    $("speakers").value = state.setup.speakers || "";
-    $("plannedStart").value = state.setup.plannedStart || toDatetimeLocal(new Date());
-    $("observer").value = state.setup.observer || "";
-    $("coordinatorEmail").value = state.settings.coordinatorEmail || DEFAULT_EMAIL;
-  }
-
-  function renderMeta() {
-    var planned = parseDatetimeLocal(state.setup.plannedStart);
-    var actual = actualStartDate();
-    $("metaPlanned").textContent = planned ? formatHM(planned) : "—";
-    $("metaActual").textContent = actual ? formatHMS(actual) : "—";
-    var now = new Date();
-    $("metaElapsed").textContent = planned ? formatElapsed(minutesBetween(planned, now)) : "—";
-  }
-
-  function renderLog() {
-    var list = sortedActivities();
-    var empty = $("logEmpty");
-    var ol = $("logList");
-    if (!list.length) {
-      empty.classList.remove("hidden");
-      ol.innerHTML = "";
-      return;
-    }
-    empty.classList.add("hidden");
-    ol.innerHTML = list.map(function (entry) {
-      var t = new Date(entry.time);
-      var planned = parseDatetimeLocal(state.setup.plannedStart);
-      var elapsed = planned ? formatElapsed(minutesBetween(planned, t)) : "";
-      var note = entry.note ? escapeHtml(entry.note) : "";
-      return '<li class="log-item" data-id="' + escapeHtml(entry.id) + '">' +
-        '<div>' +
-          '<div class="log-time">' + escapeHtml(formatHMS(t)) + (elapsed ? " (" + elapsed + ")" : "") + "</div>" +
-          '<div class="log-type">' + escapeHtml(activityLabel(entry)) + "</div>" +
-          (note ? '<div class="log-note">' + note + "</div>" : "") +
-        "</div>" +
-        '<div class="log-actions">' +
-          '<button type="button" class="linkish" data-edit="' + escapeHtml(entry.id) + '">Edit</button>' +
-          '<button type="button" class="linkish danger" data-delete="' + escapeHtml(entry.id) + '">Delete</button>' +
-        "</div>" +
-      "</li>";
-    }).join("");
-  }
-
-  function renderReport() {
-    $("reportPreview").value = buildReport();
-  }
-
-  function scrollEntry(id) {
-    var el = document.querySelector('.log-item[data-id="' + id + '"]');
-    if (el && el.scrollIntoView) {
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }
-
-  function renderAll() {
-    renderMeta();
-    renderLog();
-    renderReport();
-  }
-
-  function toast(msg) {
+  function toast(message) {
     var el = $("toast");
-    el.textContent = msg;
+    el.textContent = message;
     el.classList.add("show");
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { el.classList.remove("show"); }, 2400);
   }
 
-  function setExportStatus(msg, isError) {
+  function setStatus(message, isError) {
+    exportNote = { text: message || "", error: !!isError };
     var el = $("exportStatus");
-    el.textContent = msg || "";
-    el.classList.toggle("error", !!isError);
+    if (el) {
+      el.textContent = exportNote.text;
+      el.classList.toggle("error", exportNote.error);
+    }
+    if (message && document.body.dataset.view !== "report") toast(message);
+  }
+
+  function buzz() {
+    if (!navigator.vibrate) return;
+    try { navigator.vibrate(12); } catch (e) { /* ignore */ }
   }
 
   function openModal(id) {
     lastFocused = document.activeElement;
-    $("toast").classList.remove("show");
     $(id).classList.remove("hidden");
-    document.body.style.overflow = "hidden";
     document.body.classList.add("modal-open");
+    var dialog = $(id).querySelector(".modal");
+    if (dialog && dialog.focus) dialog.focus();
+    var auto = $(id).querySelector("[data-autofocus]");
+    if (auto) setTimeout(function () { try { auto.focus(); } catch (e) { /* ignore */ } }, 40);
   }
 
   function closeModal(id) {
     $(id).classList.add("hidden");
-    if (document.querySelectorAll(".modal-backdrop:not(.hidden)").length === 0) {
-      document.body.style.overflow = "";
+    if (!document.querySelector(".modal-backdrop:not(.hidden)")) {
       document.body.classList.remove("modal-open");
     }
     if (lastFocused && lastFocused.focus) {
@@ -338,397 +700,886 @@
     }
   }
 
-  function buildActivityGrid() {
-    var grid = $("activityGrid");
-    grid.innerHTML = ACTIVITY_TYPES.map(function (type) {
-      return '<button type="button" data-type="' + escapeHtml(type) + '">' + escapeHtml(type) + "</button>";
-    }).join("");
-    var sel = $("editType");
-    sel.innerHTML = ACTIVITY_TYPES.map(function (type) {
-      return '<option value="' + escapeHtml(type) + '">' + escapeHtml(type) + "</option>";
-    }).join("");
+  function setIdle(id, value) {
+    var el = $(id);
+    if (!el || document.activeElement === el) return;
+    var next = value || "";
+    if (el.value !== next) el.value = next;
   }
 
-  function resetPicker() {
-    pendingIso = null;
-    pendingType = null;
-    $("otherText").value = "";
-    $("activityNote").value = "";
-    $("otherBox").classList.add("hidden");
-    $("activityAddRow").classList.add("hidden");
-    var pressed = $("activityGrid").querySelectorAll('[aria-pressed="true"]');
-    for (var i = 0; i < pressed.length; i++) pressed[i].setAttribute("aria-pressed", "false");
+  function draftSession() {
+    var current = currentSession();
+    if (current && current.status === "setup") return current;
+    var fresh = blankSession(lastObserver());
+    state.sessions.push(fresh);
+    state.currentId = fresh.id;
+    return fresh;
   }
 
-  function openPicker() {
-    pendingIso = new Date().toISOString();
-    pendingType = null;
-    $("otherText").value = "";
-    $("activityNote").value = "";
-    $("otherBox").classList.add("hidden");
-    $("activityAddRow").classList.add("hidden");
-    $("activityStamp").textContent = formatHMS(new Date(pendingIso));
-    var pressed = $("activityGrid").querySelectorAll('[aria-pressed="true"]');
-    for (var i = 0; i < pressed.length; i++) pressed[i].setAttribute("aria-pressed", "false");
-    openModal("activityModal");
-    if (navigator.vibrate) {
-      try { navigator.vibrate(12); } catch (e) { /* ignore */ }
-    }
-  }
-
-  function closePicker() {
-    closeModal("activityModal");
-    resetPicker();
-  }
-
-  function addActivity(type, other, note, iso) {
-    var id = uid();
-    state.activities.push({
-      id: id,
-      time: iso || new Date().toISOString(),
-      type: type,
-      other: other || "",
-      note: (note || "").trim()
-    });
+  function persistSetupFromForm() {
+    var session = draftSession();
+    session.title = $("sessionTitle").value;
+    session.speakers = $("speakers").value;
+    session.plannedStart = $("plannedStart").value;
+    session.observer = $("observer").value;
+    session.updatedAt = new Date().toISOString();
     save();
-    renderAll();
-    scrollEntry(id);
+    return session;
   }
 
-  function pickType(type) {
-    pendingType = type;
-    var buttons = $("activityGrid").querySelectorAll("button");
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].setAttribute("aria-pressed", buttons[i].getAttribute("data-type") === type ? "true" : "false");
-    }
-    if (type === OTHER_TYPE) {
-      $("otherBox").classList.remove("hidden");
-      $("activityAddRow").classList.remove("hidden");
-      $("otherText").focus();
+  function captureRunningFields() {
+    var session = currentSession();
+    var seg = runningSegment(session);
+    if (!seg) return;
+    var note = $("runNote");
+    var group = $("runGroup");
+    if (note) seg.note = note.value.trim();
+    if (group) seg.groupSize = parseGroupSize(group.value);
+  }
+
+  function startSegment(session, type, when, extra) {
+    var iso = when.toISOString();
+    var running = runningSegment(session);
+    if (running) running.end = iso;
+    session.segments.push({
+      id: uid(),
+      type: type,
+      otherLabel: (extra && extra.otherLabel) || "",
+      start: iso,
+      end: null,
+      note: (extra && extra.note) || "",
+      groupSize: extra && extra.groupSize != null ? extra.groupSize : null
+    });
+    session.status = "live";
+    session.updatedAt = iso;
+    save();
+    render();
+  }
+
+  function chooseActivity(type) {
+    var session = currentSession();
+    if (!session || session.status !== "live") return;
+    var nowMs = Date.now();
+    if (lastTap.type === type && nowMs - lastTap.at < DOUBLE_TAP_MS) {
+      toast("Double tap ignored");
       return;
     }
-    addActivity(type, "", $("activityNote").value, pendingIso);
-    closePicker();
-    toast("Logged");
+    lastTap = { type: type, at: nowMs };
+    var when = new Date();
+    if (type === "Other activity") {
+      openOther(when);
+      return;
+    }
+    captureRunningFields();
+    startSegment(session, type, when, {});
+    buzz();
+  }
+
+  function openOther(when) {
+    pendingOtherAt = when;
+    $("otherStart").textContent = formatHMS(when);
+    $("otherText").value = "";
+    $("otherGroup").value = "";
+    $("otherNote").value = "";
+    $("otherSave").disabled = true;
+    openModal("otherModal");
+    buzz();
   }
 
   function confirmOther() {
-    var other = $("otherText").value.trim();
-    if (!other) {
-      toast("Please describe the activity");
+    var label = $("otherText").value.trim();
+    if (!pendingOtherAt || !label) {
+      toast("Describe the activity");
       $("otherText").focus();
       return;
     }
-    addActivity(OTHER_TYPE, other, $("activityNote").value, pendingIso);
-    closePicker();
-    toast("Activity logged");
-  }
-
-  function findActivity(id) {
-    for (var i = 0; i < state.activities.length; i++) {
-      if (state.activities[i].id === id) return state.activities[i];
-    }
-    return null;
-  }
-
-  function openEdit(id) {
-    var entry = findActivity(id);
-    if (!entry) return;
-    editingId = id;
-    var d = new Date(entry.time);
-    $("editTime").value = formatHMS(d);
-    $("editType").value = entry.type;
-    $("editOther").value = entry.other || "";
-    $("editNote").value = entry.note || "";
-    $("editOtherBox").classList.toggle("hidden", entry.type !== OTHER_TYPE);
-    openModal("editModal");
-  }
-
-  function applyEditedTime(entry, hms) {
-    var m = String(hms || "").trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) return false;
-    var h = +m[1], min = +m[2], sec = m[3] ? +m[3] : 0;
-    if (h > 23 || min > 59 || sec > 59) return false;
-    var d = new Date(entry.time);
-    d.setHours(h, min, sec, 0);
-    entry.time = d.toISOString();
-    return true;
-  }
-
-  function saveEdit() {
-    var entry = findActivity(editingId);
-    if (!entry) return closeModal("editModal");
-    if (!applyEditedTime(entry, $("editTime").value)) {
-      toast("Use time as HH:MM:SS");
-      $("editTime").focus();
-      return;
-    }
-    entry.type = $("editType").value;
-    entry.other = entry.type === OTHER_TYPE ? $("editOther").value.trim() : "";
-    if (entry.type === OTHER_TYPE && !entry.other) {
-      toast("Please describe the activity");
-      $("editOther").focus();
-      return;
-    }
-    entry.note = $("editNote").value.trim();
-    save();
-    renderAll();
-    closeModal("editModal");
-    editingId = null;
-    toast("Entry updated");
-  }
-
-  function deleteActivity(id, skipConfirm) {
-    if (!skipConfirm && !window.confirm("Delete this activity?")) return;
-    state.activities = state.activities.filter(function (a) { return a.id !== id; });
-    save();
-    renderAll();
-    toast("Entry deleted");
-  }
-
-  function newSession() {
-    var observer = state.setup.observer;
-    var email = state.settings.coordinatorEmail;
-    state = defaultState();
-    state.setup.observer = observer;
-    state.settings.coordinatorEmail = email || DEFAULT_EMAIL;
-    fillForm();
-    save();
-    renderAll();
-    $("setupFields").classList.remove("hidden");
-    $("setupToggle").textContent = "Hide";
-    closeModal("confirmModal");
-    toast("New session started");
-  }
-
-  function downloadTxt() {
-    var text = buildReport();
-    var name = reportFilename();
-    try {
-      var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      setExportStatus("Saved as “" + name + "”. On iPhone this may open in Files or a share sheet, not Downloads.");
-      toast("File ready");
-    } catch (e) {
-      setExportStatus("Could not download the file. Use Copy or Share instead.", true);
-    }
-  }
-
-  function shareReport() {
-    var text = buildReport();
-    var name = reportFilename();
-    var title = state.setup.title ? "Session Script: " + state.setup.title : "Session Script";
-    if (!navigator.share) {
-      setExportStatus("Sharing is not available in this browser. The report was copied instead — paste it into WhatsApp or Mail.", true);
-      copyText(text, true);
-      return;
-    }
-    var payload = { title: title, text: text };
-    var fileShare = null;
-    try {
-      var file = new File([text], name, { type: "text/plain" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        fileShare = { title: title, text: text, files: [file] };
-      }
-    } catch (e) {
-      fileShare = null;
-    }
-    var attempt = fileShare || payload;
-    navigator.share(attempt).then(function () {
-      setExportStatus("Shared.");
-    }).catch(function (err) {
-      if (err && err.name === "AbortError") return;
-      if (fileShare && attempt === fileShare) {
-        return navigator.share(payload);
-      }
-      throw err;
-    }).catch(function (err) {
-      if (err && err.name === "AbortError") return;
-      setExportStatus("Share did not work. The report was copied instead.", true);
-      copyText(text, true);
+    var session = currentSession();
+    if (!session || session.status !== "live") return;
+    captureRunningFields();
+    var when = pendingOtherAt;
+    pendingOtherAt = null;
+    closeModal("otherModal");
+    startSegment(session, "Other activity", when, {
+      otherLabel: label,
+      groupSize: parseGroupSize($("otherGroup").value),
+      note: $("otherNote").value.trim()
     });
   }
 
-  function copyText(text, silent) {
-    var value = text != null ? text : buildReport();
+  function cancelOther() {
+    pendingOtherAt = null;
+    lastTap = { type: "", at: 0 };
+    closeModal("otherModal");
+  }
+
+  function undoLast() {
+    var session = currentSession();
+    if (!session || session.status !== "live" || !session.segments.length) return;
+    session.segments.pop();
+    if (session.segments.length) session.segments[session.segments.length - 1].end = null;
+    lastTap = { type: "", at: 0 };
+    session.updatedAt = new Date().toISOString();
+    save();
+    render();
+    toast("Last tap undone");
+  }
+
+  function selectedClosing() {
+    var picked = document.querySelector('input[name="closing"]:checked');
+    return picked ? picked.value : "";
+  }
+
+  function closingValid() {
+    var answer = selectedClosing();
+    if (!answer) return false;
+    if (answer === "Other" && !$("closingOther").value.trim()) return false;
+    return true;
+  }
+
+  function refreshEndForm() {
+    $("closingOtherWrap").classList.toggle("hidden", selectedClosing() !== "Other");
+    $("endConfirmBtn").disabled = !closingValid();
+  }
+
+  function openEnd() {
+    var session = currentSession();
+    if (!session || session.status !== "live") return;
+    captureRunningFields();
+    save();
+    var radios = document.querySelectorAll('input[name="closing"]');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = false;
+    $("closingOther").value = "";
+    $("closingComment").value = "";
+    refreshEndForm();
+    openModal("endModal");
+  }
+
+  function isIOS() {
+    var ua = navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  }
+
+  function canShareFiles(files) {
+    if (!files || !files[0] || !files[1] || !navigator.share || !navigator.canShare) return false;
+    try { return navigator.canShare({ files: files }); } catch (e) { return false; }
+  }
+
+  function downloadText(name, text, mime, bom) {
+    var blob = new Blob([(bom ? "\ufeff" : "") + text], { type: mime + ";charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(function () {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 2500);
+  }
+
+  function autoSaveFiles(session) {
+    var files = buildFiles(session);
+    var ios = isIOS();
+    session.lastFiles = {
+      txtName: files.txtName,
+      csvName: files.csvName,
+      method: ios ? "share" : "download",
+      savedAt: new Date().toISOString()
+    };
+    session.dirtyExport = false;
+    exportNote = { text: "", error: false };
+    save();
+    render();
+    if (ios) {
+      var packed = [files.txtFile, files.csvFile];
+      if (canShareFiles(packed)) {
+        navigator.share({
+          files: packed,
+          title: "Session Script — " + COORDINATOR,
+          text: "Save both files to Files, then email them to " + COORDINATOR + ".\n\n" + files.txtName + "\n" + files.csvName
+        }).catch(function (err) {
+          if (err && err.name === "AbortError") return;
+          setStatus("The share sheet did not open. Use Save TXT and Save CSV, then email both files to " + COORDINATOR + ".", true);
+        });
+      } else {
+        setStatus("This browser cannot open the share sheet. Use Save TXT and Save CSV, then email both files to " + COORDINATOR + ".", true);
+      }
+      return;
+    }
+    downloadText(files.txtName, files.txt, "text/plain", false);
+    downloadText(files.csvName, files.csv, "text/csv", true);
+  }
+
+  function finalizeSession() {
+    if (!closingValid()) return;
+    var session = currentSession();
+    if (!session || session.status !== "live") return;
+    captureRunningFields();
+    var when = new Date();
+    var running = runningSegment(session);
+    if (running) running.end = when.toISOString();
+    var answer = selectedClosing();
+    session.closing = {
+      answer: answer,
+      otherText: answer === "Other" ? $("closingOther").value.trim() : "",
+      comment: $("closingComment").value.trim()
+    };
+    session.status = "ended";
+    session.endedAt = when.toISOString();
+    session.updatedAt = session.endedAt;
+    state.screen = null;
+    closeModal("endModal");
+    autoSaveFiles(session);
+    toast("Session saved");
+  }
+
+  function clearDirty(session) {
+    if (!session || !session.dirtyExport) return;
+    session.dirtyExport = false;
+    save();
+    var note = $("dirtyNote");
+    if (note) note.remove();
+  }
+
+  function openMailto(session, files) {
+    var subject = "Session Script: " + (session.title || "session") +
+      (session.observer ? " — " + session.observer : "");
+    var body = files.txt + "\n\n---\nPlease attach the CSV file " + files.csvName + " as well.";
+    var href = "mailto:" + COORDINATOR +
+      "?subject=" + encodeURIComponent(subject) +
+      "&body=" + encodeURIComponent(body);
+    var message = "Your mail app should open a message to " + COORDINATOR +
+      " with the text report. Attach the CSV file " + files.csvName + ".";
+    if (href.length > 1900) {
+      copyText(files.txt, true);
+      message = "The report is long for an email link, so the text was copied. Email " +
+        COORDINATOR + " and attach " + files.csvName + ".";
+      setStatus(message, true);
+      return;
+    }
+    setStatus(message);
+    window.location.href = href;
+  }
+
+  function emailToMaarten(session) {
+    if (!session) return;
+    var files = buildFiles(session);
+    var packed = [files.txtFile, files.csvFile];
+    var payload = {
+      files: packed,
+      title: "Session Script — " + COORDINATOR,
+      text: "To: " + COORDINATOR + "\n\n" + files.txt
+    };
+    if (canShareFiles(packed)) {
+      navigator.share(payload).then(function () {
+        clearDirty(session);
+        setStatus("Shared. Send both files to " + COORDINATOR + ".");
+      }).catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        openMailto(session, files);
+      });
+      return;
+    }
+    openMailto(session, files);
+  }
+
+  function shareReport(session) {
+    var files = buildFiles(session);
+    var packed = [files.txtFile, files.csvFile];
+    var title = "Session Script: " + (session.title || "session");
+    if (canShareFiles(packed)) {
+      navigator.share({ files: packed, title: title, text: files.txt }).then(function () {
+        clearDirty(session);
+        setStatus("Shared.");
+      }).catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        shareText(files, title);
+      });
+      return;
+    }
+    shareText(files, title);
+  }
+
+  function shareText(files, title) {
+    if (navigator.share) {
+      navigator.share({ title: title, text: files.txt }).then(function () {
+        setStatus("Shared the text report. Use Save CSV if you still need the spreadsheet.");
+      }).catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        copyText(files.txt, true);
+        setStatus("Sharing did not work. The text report was copied.", true);
+      });
+      return;
+    }
+    copyText(files.txt, true);
+    setStatus("Sharing is not available in this browser. The text report was copied.");
+  }
+
+  function copyText(value, silent) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(value).then(function () {
         if (!silent) {
-          setExportStatus("Copied to clipboard.");
+          setStatus("Copied the text report.");
           toast("Copied");
         }
-      }).catch(function () {
-        return fallbackCopy(value, silent);
-      });
+      }).catch(function () { return fallbackCopy(value, silent); });
     }
     return fallbackCopy(value, silent);
   }
 
   function fallbackCopy(value, silent) {
     return new Promise(function (resolve) {
-      var ta = $("reportPreview");
-      var prev = ta.value;
-      ta.value = value;
-      ta.removeAttribute("readonly");
-      ta.focus();
-      ta.select();
+      var area = document.createElement("textarea");
+      area.value = value;
+      area.setAttribute("readonly", "readonly");
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
       var ok = false;
       try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
-      ta.setAttribute("readonly", "readonly");
-      ta.value = prev;
-      if (ok) {
-        if (!silent) {
-          setExportStatus("Copied to clipboard.");
+      area.remove();
+      if (!silent) {
+        if (ok) {
+          setStatus("Copied the text report.");
           toast("Copied");
+        } else {
+          setStatus("Could not copy. Select the text report and copy it yourself.", true);
         }
-      } else if (!silent) {
-        setExportStatus("Could not copy. Select the report text above and copy it yourself.", true);
       }
       resolve(ok);
     });
   }
 
-  function openWhatsApp() {
-    var text = buildReport();
+  function openWhatsApp(session) {
+    var text = buildReport(session);
     var url = "https://wa.me/?text=" + encodeURIComponent(text);
     if (url.length > 1800) {
       copyText(text, true);
-      setExportStatus("The report is long for a WhatsApp link, so it was copied. Open WhatsApp and paste it.", true);
+      setStatus("The report is long for a WhatsApp link, so it was copied. Open WhatsApp and paste it.", true);
       toast("Copied — paste in WhatsApp");
       return;
     }
     window.location.href = url;
   }
 
-  function openEmail() {
-    var text = buildReport();
-    var email = (state.settings.coordinatorEmail || DEFAULT_EMAIL).trim();
-    var subject = "Session Script: " + (state.setup.title || "session") +
-      (state.setup.observer ? " — " + state.setup.observer : "");
-    var href = "mailto:" + encodeURIComponent(email) +
-      "?subject=" + encodeURIComponent(subject) +
-      "&body=" + encodeURIComponent(text);
-    if (href.length > 1800) {
-      copyText(text, true);
-      setExportStatus("The report is long for email links, so it was copied. Open your mail app and paste it to " + email + ".", true);
-      toast("Copied — paste into email");
-      return;
-    }
-    window.location.href = href;
-  }
-
-  function probeServer() {
-    if (!/^https?:$/i.test(location.protocol)) {
-      $("sendServerBtn").classList.add("hidden");
-      return;
-    }
-    fetch("./api/status", { headers: { "Accept": "application/json" } })
-      .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
-      .then(function (data) {
-        serverAvailable = !!(data && data.ok);
-        $("sendServerBtn").classList.toggle("hidden", !serverAvailable);
-        if (serverAvailable) {
-          $("serverHint").textContent = "This copy is running on the Session Script server. Use Send to server to store your report in the reports folder.";
-        }
-      })
-      .catch(function () {
-        serverAvailable = false;
-        $("sendServerBtn").classList.add("hidden");
-      });
+  function saveSingle(kind) {
+    var session = currentSession();
+    if (!session) return;
+    var files = buildFiles(session);
+    if (kind === "csv") downloadText(files.csvName, files.csv, "text/csv", true);
+    else downloadText(files.txtName, files.txt, "text/plain", false);
+    clearDirty(session);
+    setStatus("Saved “" + (kind === "csv" ? files.csvName : files.txtName) + "”.");
   }
 
   function sendToServer() {
-    if (!serverAvailable) {
-      setExportStatus("Send to server only works when the app is opened from the Session Script server.", true);
+    var session = currentSession();
+    if (!session || !serverAvailable) {
+      setStatus("Send to server only works when this app is opened from the optional local server.", true);
       return;
     }
-    var payload = {
-      filename: reportFilename(),
-      text: buildReport(),
-      title: state.setup.title || "",
-      observer: state.setup.observer || ""
-    };
+    var files = buildFiles(session);
     fetch("./submit", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        filename: files.txtName,
+        text: files.txt,
+        csvFilename: files.csvName,
+        csv: "\ufeff" + files.csv,
+        title: session.title || "",
+        observer: session.observer || ""
+      })
     }).then(function (res) {
       return res.json().then(function (data) {
-        if (!res.ok || !data || !data.ok) {
-          throw new Error((data && data.error) || "Server could not save the report");
-        }
+        if (!res.ok || !data || !data.ok) throw new Error((data && data.error) || "Server could not save the report");
         return data;
       });
     }).then(function (data) {
-      setExportStatus("Saved on the server as “" + data.filename + "”.");
+      clearDirty(session);
+      var extra = data.csvFilename ? " and “" + data.csvFilename + "”" : "";
+      setStatus("Saved on the server as “" + data.filename + "”" + extra + ".");
       toast("Sent to server");
     }).catch(function (err) {
-      setExportStatus((err && err.message) || "Could not send to the server.", true);
+      setStatus((err && err.message) || "Could not send to the server.", true);
     });
   }
 
-  function onSetupInput() {
-    readSetupFromForm();
+  function createNewSession() {
+    var current = currentSession();
+    if (isBlank(current)) {
+      current.observer = lastObserver() === current.observer ? current.observer : (lastObserver() || current.observer);
+      current.plannedStart = toDatetimeLocal(new Date());
+      current.title = "";
+      current.speakers = "";
+      current.updatedAt = new Date().toISOString();
+      state.screen = null;
+      exportNote = { text: "", error: false };
+      save();
+      render();
+      return;
+    }
+    var fresh = blankSession(lastObserver());
+    state.sessions.push(fresh);
+    state.currentId = fresh.id;
+    state.screen = null;
+    exportNote = { text: "", error: false };
     save();
-    renderAll();
+    render();
+  }
+
+  function requestNewSession() {
+    var session = currentSession();
+    if (session && session.status === "live" && (session.segments.length || (session.title || "").trim())) {
+      openModal("newModal");
+      return;
+    }
+    createNewSession();
+  }
+
+  function openSession(id) {
+    if (!findSession(id)) return;
+    state.currentId = id;
+    state.screen = null;
+    exportNote = { text: "", error: false };
+    save();
+    render();
+  }
+
+  function askDelete(id) {
+    var session = findSession(id);
+    if (!session) return;
+    deletingId = id;
+    var title = session.title || "Untitled session";
+    $("deleteBody").textContent = title + " will be removed from this phone. Files already saved in Downloads or Files stay there. This cannot be undone.";
+    openModal("deleteModal");
+  }
+
+  function confirmDelete() {
+    if (!deletingId) return;
+    var id = deletingId;
+    deletingId = null;
+    state.sessions = state.sessions.filter(function (session) { return session.id !== id; });
+    if (state.currentId === id) {
+      state.currentId = null;
+      state.screen = "past";
+    }
+    save();
+    closeModal("deleteModal");
+    render();
+    toast("Session deleted");
+  }
+
+  function showPast() {
+    if (document.body.dataset.view === "setup" && ($("sessionTitle").value || $("observer").value || $("speakers").value)) {
+      persistSetupFromForm();
+    }
+    if (document.body.dataset.view === "live") {
+      captureRunningFields();
+      save();
+    }
+    state.screen = "past";
+    render();
+  }
+
+  function togglePast() {
+    if (state.screen === "past") {
+      state.screen = null;
+      render();
+      return;
+    }
+    showPast();
+  }
+
+  function segmentItemHtml(seg) {
+    var ended = !!seg.end;
+    var start = formatHMS(new Date(seg.start));
+    var timeLine = ended ? start + " – " + formatHMS(new Date(seg.end)) : start;
+    var badge = ended
+      ? '<span class="dur">' + escapeHtml(formatSeconds(segmentSeconds(seg))) + "</span>"
+      : '<span class="dur dur-live">Running</span>';
+    var group = seg.groupSize ? " · group of " + seg.groupSize : "";
+    var note = (seg.note || "").trim();
+    return '<li class="log-item" data-id="' + escapeHtml(seg.id) + '" data-type="' + escapeHtml(seg.type) + '" data-running="' + (ended ? "false" : "true") + '" data-seconds="' + (ended ? String(segmentSeconds(seg)) : "") + '">' +
+      '<div class="log-type">' + escapeHtml(segmentLabel(seg) + group) + "</div>" +
+      badge +
+      '<div class="log-time">' + escapeHtml(timeLine) + "</div>" +
+      '<button type="button" class="linkish" data-edit="' + escapeHtml(seg.id) + '">Edit</button>' +
+      (note ? '<p class="log-note">' + escapeHtml(note) + "</p>" : "") +
+      "</li>";
+  }
+
+  function renderLog(list, emptyEl, session) {
+    var segs = orderedSegments(session);
+    if (emptyEl) emptyEl.classList.toggle("hidden", !!segs.length);
+    list.innerHTML = segs.map(segmentItemHtml).join("");
+  }
+
+  function renderStrip(session) {
+    var speakers = speakersList(session).join(", ") || "No speakers yet";
+    var planned = parseDatetimeLocal(session.plannedStart);
+    $("sessionStrip").innerHTML =
+      '<p class="strip-title">' + escapeHtml(session.title || "Untitled session") + "</p>" +
+      '<p class="strip-sub">' + escapeHtml(speakers) + " · Planned " + escapeHtml(planned ? formatHM(planned) : "—") + "</p>";
+  }
+
+  function bindRunning(seg) {
+    var note = $("runNote");
+    var group = $("runGroup");
+    var undo = $("undoBtn");
+    if (undo) {
+      undo.disabled = !currentSession().segments.length;
+      undo.addEventListener("click", undoLast);
+    }
+    if (note) {
+      note.value = seg && seg.note ? seg.note : "";
+      note.addEventListener("input", function () {
+        var live = runningSegment(currentSession());
+        if (!live) return;
+        live.note = note.value;
+        liveSessionTouch();
+      });
+      note.addEventListener("blur", function () {
+        captureRunningFields();
+        save();
+      });
+    }
+    if (group) {
+      group.value = seg && seg.groupSize != null ? String(seg.groupSize) : "";
+      group.addEventListener("input", function () {
+        var live = runningSegment(currentSession());
+        if (!live) return;
+        live.groupSize = parseGroupSize(group.value);
+        liveSessionTouch();
+      });
+    }
+  }
+
+  function liveSessionTouch() {
+    var session = currentSession();
+    if (!session) return;
+    session.updatedAt = new Date().toISOString();
+    save();
+  }
+
+  function renderRunning(session) {
+    var card = $("runningCard");
+    var seg = runningSegment(session);
+    var key = seg ? [seg.id, seg.type, seg.otherLabel || ""].join("|") : "none";
+    markPressed(seg ? seg.type : "");
+    if (card.getAttribute("data-key") === key && card.contains(document.activeElement)) {
+      var ticking = $("runTimer");
+      if (ticking && seg) ticking.textContent = formatElapsed(seg.start);
+      var undoLive = $("undoBtn");
+      if (undoLive) undoLive.disabled = !session.segments.length;
+      return;
+    }
+    card.setAttribute("data-key", key);
+    if (!seg) {
+      card.innerHTML =
+        '<p class="run-empty-title">Tap an activity</p>' +
+        '<p class="run-empty-copy">The start time is taken when you tap. Duration appears when the next activity starts, or when you end the session.</p>' +
+        '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>';
+      bindRunning(null);
+      return;
+    }
+    var groupField = wantsGroup(seg.type)
+      ? '<div class="field"><label for="runGroup">Group size <span class="opt">(optional)</span></label>' +
+        '<input type="number" id="runGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 4"></div>'
+      : "";
+    card.innerHTML =
+      '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span> Running</p>' +
+      '<h3 class="run-name">' + escapeHtml(segmentLabel(seg)) + "</h3>" +
+      '<p class="run-start">Started ' + escapeHtml(formatHMS(new Date(seg.start))) + "</p>" +
+      '<p class="run-timer" id="runTimer">' + escapeHtml(formatElapsed(seg.start)) + "</p>" +
+      groupField +
+      '<div class="field"><div class="note-row"><label for="runNote">Note <span class="opt">(optional)</span></label>' +
+      '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button></div>' +
+      '<textarea id="runNote" rows="1" placeholder="Anything worth remembering"></textarea></div>';
+    bindRunning(seg);
+  }
+
+  function markPressed(type) {
+    var buttons = $("activityGrid").querySelectorAll("button[data-type]");
+    for (var i = 0; i < buttons.length; i++) {
+      if (type && buttons[i].getAttribute("data-type") === type) buttons[i].setAttribute("aria-pressed", "true");
+      else buttons[i].removeAttribute("aria-pressed");
+    }
+  }
+
+  function saveCardHtml(session) {
+    var files = session.lastFiles;
+    var ios = files && files.method === "share";
+    var title = !files ? "Ready to send" : (ios ? "Save to Files" : "Saved to Downloads");
+    var body;
+    if (!files) {
+      body = "Save the CSV and the TXT, then email both files to " + COORDINATOR + ".";
+    } else if (ios) {
+      body = "iPhone cannot save files silently. The share sheet opens so you can choose Save to Files. Then email both files to " + COORDINATOR + ".";
+    } else {
+      body = "Both files were saved on this phone. Email them to " + COORDINATOR + ".";
+    }
+    var names = files
+      ? '<p class="file-name">' + escapeHtml(files.txtName) + '</p><p class="file-name">' + escapeHtml(files.csvName) + "</p>"
+      : "";
+    var dirty = session.dirtyExport
+      ? '<p id="dirtyNote">Details changed after these files were saved. Save them again before you email.</p>'
+      : "";
+    return '<p class="save-kicker">Session ended</p><h3>' + escapeHtml(title) + "</h3><p>" +
+      escapeHtml(body) + "</p>" + names + dirty;
+  }
+
+  function totalsHtml(session) {
+    var totals = computeTotals(session);
+    var rows = totals.buckets.map(function (bucket) {
+      var shown = bucket.seconds === 0 ? "0 min" : formatSeconds(bucket.seconds);
+      var pct = (bucket.tenths / 10).toFixed(1);
+      return '<div class="total-row" data-bucket="' + bucket.id + '" data-seconds="' + bucket.seconds + '" data-percent="' + pct + '">' +
+        '<div class="top"><strong>' + escapeHtml(bucket.label) + '</strong><span class="nums">' +
+        escapeHtml(shown) + " · " + pct + "%</span></div>" +
+        '<div class="bar" aria-hidden="true"><span style="width:' + pct + '%"></span></div></div>';
+    }).join("");
+    var avg = formatAvg(totals.averageGroup);
+    var comment = session.closing && session.closing.comment ? "<br>" + escapeHtml(session.closing.comment) : "";
+    return '<div class="total-head"><h2>Totals</h2><div class="session-len" data-total-seconds="' + totals.totalSeconds + '">' +
+      escapeHtml(totals.totalSeconds ? formatSeconds(totals.totalSeconds) : "0 min") + "</div></div>" +
+      rows +
+      '<p class="avg-line" data-group-avg="' + escapeHtml(avg == null ? "" : avg) + '">Average group size: ' +
+      escapeHtml(avg == null ? "—" : avg) + "</p>" +
+      '<p class="closing-line"><strong>After the closing announcement</strong>' +
+      escapeHtml(closingAnswerText(session)) + comment + "</p>";
+  }
+
+  function pastCardHtml(session) {
+    var badgeClass = session.status === "ended" ? "ended" : (session.status === "live" ? "live" : "setup");
+    var badgeText = session.status === "ended" ? "Ended" : (session.status === "live" ? "In progress" : "Not started");
+    var speakers = speakersList(session).join(", ");
+    var showEmail = session.status === "ended" || session.segments.length > 0;
+    var email = showEmail ? '<button type="button" class="btn btn-primary" data-email>Email to Maarten</button>' : "";
+    return '<article class="card session-card" data-id="' + escapeHtml(session.id) + '">' +
+      '<div class="session-top"><h3>' + escapeHtml(session.title || "Untitled session") + '</h3>' +
+      '<span class="badge ' + badgeClass + '">' + badgeText + "</span></div>" +
+      '<p class="session-meta">' + escapeHtml(formatDateShort(sessionDate(session)) + " · " + (session.observer || "No observer name")) + "</p>" +
+      '<p class="session-meta">' + escapeHtml(formatSeconds(sessionSeconds(session)) + (speakers ? " · " + speakers : "")) + "</p>" +
+      '<div class="session-actions' + (showEmail ? "" : " two") + '">' +
+      '<button type="button" class="btn" data-open>Open</button>' + email +
+      '<button type="button" class="btn btn-danger" data-delete>Delete</button></div></article>';
+  }
+
+  function renderSetup(session) {
+    var model = session || {
+      title: "",
+      speakers: "",
+      plannedStart: toDatetimeLocal(new Date()),
+      observer: lastObserver()
+    };
+    setIdle("sessionTitle", model.title);
+    setIdle("speakers", model.speakers);
+    setIdle("plannedStart", model.plannedStart || toDatetimeLocal(new Date()));
+    setIdle("observer", model.observer);
+  }
+
+  function renderLive(session) {
+    renderStrip(session);
+    setIdle("liveTitle", session.title);
+    setIdle("liveSpeakers", session.speakers);
+    setIdle("livePlanned", session.plannedStart);
+    setIdle("liveObserver", session.observer);
+    renderRunning(session);
+    renderLog($("logList"), $("logEmpty"), session);
+  }
+
+  function renderReport(session) {
+    if (!session) return;
+    $("saveConfirm").innerHTML = saveCardHtml(session);
+    $("totalsCard").innerHTML = totalsHtml(session);
+    renderLog($("reportLog"), null, session);
+    $("reportPreview").value = buildReport(session);
+    $("csvPreview").value = buildCsv(session);
+    var status = $("exportStatus");
+    status.textContent = exportNote.text;
+    status.classList.toggle("error", exportNote.error);
+  }
+
+  function renderPast() {
+    var list = state.sessions.filter(isListed).sort(function (a, b) {
+      return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+    });
+    $("pastEmpty").classList.toggle("hidden", list.length > 0);
+    $("pastList").innerHTML = list.map(pastCardHtml).join("");
+  }
+
+  function render() {
+    var session = currentSession();
+    var view = "setup";
+    if (state.screen === "past") view = "past";
+    else if (session && session.status === "ended") view = "report";
+    else if (session && session.status === "live") view = "live";
+    document.body.dataset.view = view;
+    $("pastBtn").textContent = view === "past" ? "Back" : "Past";
+    $("pastBtn").setAttribute("aria-label", view === "past" ? "Back to the session" : "Past sessions");
+    if (view === "setup") renderSetup(session && session.status === "setup" ? session : null);
+    if (view === "live") renderLive(session);
+    if (view === "report") renderReport(session);
+    if (view === "past") renderPast();
+    $("sendServerBtn").classList.toggle("hidden", !serverAvailable);
+  }
+
+  function openEdit(id) {
+    var session = currentSession();
+    var seg = findSegment(session, id);
+    if (!seg) return;
+    editingId = id;
+    $("editType").value = seg.type;
+    $("editOther").value = seg.otherLabel || "";
+    $("editGroup").value = seg.groupSize == null ? "" : String(seg.groupSize);
+    $("editNote").value = seg.note || "";
+    $("editStart").textContent = formatHMS(new Date(seg.start));
+    $("editDuration").textContent = seg.end ? formatSeconds(segmentSeconds(seg)) : "Still running";
+    toggleEditFields();
+    openModal("editModal");
+  }
+
+  function toggleEditFields() {
+    var type = $("editType").value;
+    $("editOtherWrap").classList.toggle("hidden", type !== "Other activity");
+    $("editGroupWrap").classList.toggle("hidden", !wantsGroup(type));
+  }
+
+  function saveEdit() {
+    var session = currentSession();
+    var seg = findSegment(session, editingId);
+    if (!session || !seg) {
+      editingId = null;
+      closeModal("editModal");
+      return;
+    }
+    var type = $("editType").value;
+    var otherLabel = type === "Other activity" ? $("editOther").value.trim() : "";
+    if (type === "Other activity" && !otherLabel) {
+      toast("Describe the activity");
+      $("editOther").focus();
+      return;
+    }
+    seg.type = type;
+    seg.otherLabel = otherLabel;
+    seg.groupSize = wantsGroup(type) ? parseGroupSize($("editGroup").value) : null;
+    seg.note = $("editNote").value.trim();
+    if (session.status === "ended") session.dirtyExport = true;
+    session.updatedAt = new Date().toISOString();
+    editingId = null;
+    save();
+    closeModal("editModal");
+    render();
+    toast("Segment updated");
+  }
+
+  function onLogClick(ev) {
+    var button = ev.target.closest("[data-edit]");
+    if (!button) return;
+    openEdit(button.getAttribute("data-edit"));
+  }
+
+  function onLiveDetails() {
+    var session = currentSession();
+    if (!session) return;
+    session.title = $("liveTitle").value;
+    session.speakers = $("liveSpeakers").value;
+    session.plannedStart = $("livePlanned").value;
+    session.observer = $("liveObserver").value;
+    session.updatedAt = new Date().toISOString();
+    if (session.status === "ended") session.dirtyExport = true;
+    save();
+    if (document.body.dataset.view === "live") renderStrip(session);
+  }
+
+  function startTiming(ev) {
+    ev.preventDefault();
+    var session = draftSession();
+    session.title = $("sessionTitle").value.trim();
+    session.speakers = $("speakers").value;
+    session.plannedStart = $("plannedStart").value || toDatetimeLocal(new Date());
+    session.observer = $("observer").value.trim();
+    if (!session.title) {
+      $("setupError").textContent = "Add a session title.";
+      $("sessionTitle").focus();
+      return;
+    }
+    if (!session.observer) {
+      $("setupError").textContent = "Add your name so the file can be identified.";
+      $("observer").focus();
+      return;
+    }
+    $("setupError").textContent = "";
+    $("sessionTitle").value = session.title;
+    $("observer").value = session.observer;
+    session.status = "live";
+    session.updatedAt = new Date().toISOString();
+    state.screen = null;
+    save();
+    render();
+  }
+
+  function fillEditTypes() {
+    $("editType").innerHTML = ACTIVITY_TYPES.map(function (type) {
+      return '<option value="' + escapeHtml(type) + '">' + escapeHtml(type) + "</option>";
+    }).join("");
   }
 
   function bind() {
+    $("setupForm").addEventListener("submit", startTiming);
     ["sessionTitle", "speakers", "plannedStart", "observer"].forEach(function (id) {
-      $(id).addEventListener("input", onSetupInput);
-      $(id).addEventListener("change", onSetupInput);
+      $(id).addEventListener("input", function () {
+        $("setupError").textContent = "";
+        persistSetupFromForm();
+      });
+      $(id).addEventListener("change", persistSetupFromForm);
     });
+    $("setupPastBtn").addEventListener("click", showPast);
+    $("pastBtn").addEventListener("click", togglePast);
 
-    $("setupToggle").addEventListener("click", function () {
-      var hidden = $("setupFields").classList.toggle("hidden");
-      $("setupToggle").textContent = hidden ? "Show" : "Hide";
+    ["liveTitle", "liveSpeakers", "livePlanned", "liveObserver"].forEach(function (id) {
+      $(id).addEventListener("input", onLiveDetails);
+      $(id).addEventListener("change", onLiveDetails);
     });
-
-    $("activityBtn").addEventListener("click", openPicker);
-    $("activityCancel").addEventListener("click", closePicker);
-    $("activityAddBtn").addEventListener("click", confirmOther);
 
     $("activityGrid").addEventListener("click", function (ev) {
-      var btn = ev.target.closest("button[data-type]");
-      if (!btn) return;
-      pickType(btn.getAttribute("data-type"));
+      var button = ev.target.closest("button[data-type]");
+      if (!button) return;
+      chooseActivity(button.getAttribute("data-type"));
+    });
+    $("endSessionBtn").addEventListener("click", openEnd);
+    $("logList").addEventListener("click", onLogClick);
+    $("reportLog").addEventListener("click", onLogClick);
+
+    $("otherText").addEventListener("input", function () {
+      $("otherSave").disabled = !$("otherText").value.trim();
+    });
+    $("otherSave").addEventListener("click", confirmOther);
+    $("otherCancel").addEventListener("click", cancelOther);
+    $("otherModal").addEventListener("click", function (ev) {
+      if (ev.target === $("otherModal")) cancelOther();
     });
 
-    $("activityModal").addEventListener("click", function (ev) {
-      if (ev.target === $("activityModal")) closePicker();
+    var radios = document.querySelectorAll('input[name="closing"]');
+    for (var i = 0; i < radios.length; i++) radios[i].addEventListener("change", refreshEndForm);
+    $("closingOther").addEventListener("input", refreshEndForm);
+    $("endCancel").addEventListener("click", function () { closeModal("endModal"); });
+    $("endConfirmBtn").addEventListener("click", finalizeSession);
+    $("endModal").addEventListener("click", function (ev) {
+      if (ev.target === $("endModal")) closeModal("endModal");
     });
 
-    $("logList").addEventListener("click", function (ev) {
-      var edit = ev.target.closest("[data-edit]");
-      var del = ev.target.closest("[data-delete]");
-      if (edit) openEdit(edit.getAttribute("data-edit"));
-      if (del) deleteActivity(del.getAttribute("data-delete"));
-    });
-
-    $("editType").addEventListener("change", function () {
-      $("editOtherBox").classList.toggle("hidden", $("editType").value !== OTHER_TYPE);
-    });
+    $("editType").addEventListener("change", toggleEditFields);
     $("editCancel").addEventListener("click", function () {
       editingId = null;
       closeModal("editModal");
     });
     $("editSave").addEventListener("click", saveEdit);
-    $("editDelete").addEventListener("click", function () {
-      if (!editingId) return;
-      if (!window.confirm("Delete this activity?")) return;
-      var id = editingId;
-      editingId = null;
-      closeModal("editModal");
-      deleteActivity(id, true);
-    });
     $("editModal").addEventListener("click", function (ev) {
       if (ev.target === $("editModal")) {
         editingId = null;
@@ -736,49 +1587,83 @@
       }
     });
 
-    $("settingsBtn").addEventListener("click", function () {
-      $("coordinatorEmail").value = state.settings.coordinatorEmail || DEFAULT_EMAIL;
-      openModal("settingsModal");
+    $("deleteKeep").addEventListener("click", function () {
+      deletingId = null;
+      closeModal("deleteModal");
     });
-    $("settingsClose").addEventListener("click", function () { closeModal("settingsModal"); });
-    $("settingsSave").addEventListener("click", function () {
-      state.settings.coordinatorEmail = $("coordinatorEmail").value.trim() || DEFAULT_EMAIL;
-      save();
-      closeModal("settingsModal");
-      toast("Settings saved");
-    });
-    $("settingsModal").addEventListener("click", function (ev) {
-      if (ev.target === $("settingsModal")) closeModal("settingsModal");
+    $("deleteConfirm").addEventListener("click", confirmDelete);
+    $("deleteModal").addEventListener("click", function (ev) {
+      if (ev.target === $("deleteModal")) {
+        deletingId = null;
+        closeModal("deleteModal");
+      }
     });
 
-    $("newSessionBtn").addEventListener("click", function () { openModal("confirmModal"); });
-    $("confirmNo").addEventListener("click", function () { closeModal("confirmModal"); });
-    $("confirmYes").addEventListener("click", newSession);
-    $("confirmModal").addEventListener("click", function (ev) {
-      if (ev.target === $("confirmModal")) closeModal("confirmModal");
+    $("newCancel").addEventListener("click", function () { closeModal("newModal"); });
+    $("newConfirm").addEventListener("click", function () {
+      closeModal("newModal");
+      createNewSession();
+    });
+    $("newModal").addEventListener("click", function (ev) {
+      if (ev.target === $("newModal")) closeModal("newModal");
     });
 
-    $("saveTxtBtn").addEventListener("click", downloadTxt);
-    $("shareBtn").addEventListener("click", shareReport);
-    $("whatsappBtn").addEventListener("click", openWhatsApp);
-    $("emailBtn").addEventListener("click", openEmail);
-    $("copyBtn").addEventListener("click", function () { copyText(); });
+    $("pastNewBtn").addEventListener("click", requestNewSession);
+    $("reportNewBtn").addEventListener("click", requestNewSession);
+    $("pastList").addEventListener("click", function (ev) {
+      var button = ev.target.closest("button");
+      if (!button) return;
+      var card = button.closest("[data-id]");
+      if (!card) return;
+      var id = card.getAttribute("data-id");
+      if (button.hasAttribute("data-open")) openSession(id);
+      if (button.hasAttribute("data-email")) emailToMaarten(findSession(id));
+      if (button.hasAttribute("data-delete")) askDelete(id);
+    });
+
+    $("emailMaartenBtn").addEventListener("click", function () { emailToMaarten(currentSession()); });
+    $("saveTxtBtn").addEventListener("click", function () { saveSingle("txt"); });
+    $("saveCsvBtn").addEventListener("click", function () { saveSingle("csv"); });
+    $("shareBtn").addEventListener("click", function () { shareReport(currentSession()); });
+    $("whatsappBtn").addEventListener("click", function () { openWhatsApp(currentSession()); });
+    $("copyBtn").addEventListener("click", function () {
+      var session = currentSession();
+      if (session) copyText(buildReport(session));
+    });
     $("sendServerBtn").addEventListener("click", sendToServer);
 
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
-      if (!$("activityModal").classList.contains("hidden")) closePicker();
+      if (!$("otherModal").classList.contains("hidden")) cancelOther();
+      else if (!$("endModal").classList.contains("hidden")) closeModal("endModal");
       else if (!$("editModal").classList.contains("hidden")) {
         editingId = null;
         closeModal("editModal");
-      } else if (!$("settingsModal").classList.contains("hidden")) closeModal("settingsModal");
-      else if (!$("confirmModal").classList.contains("hidden")) closeModal("confirmModal");
+      } else if (!$("deleteModal").classList.contains("hidden")) {
+        deletingId = null;
+        closeModal("deleteModal");
+      } else if (!$("newModal").classList.contains("hidden")) closeModal("newModal");
     });
 
     window.addEventListener("beforeunload", function () {
-      readSetupFromForm();
+      if (document.body.dataset.view === "setup") persistSetupFromForm();
+      if (document.body.dataset.view === "live") captureRunningFields();
       save();
     });
+  }
+
+  function probeServer() {
+    if (!/^https?:$/i.test(location.protocol)) return;
+    fetch("./api/status", { headers: { "Accept": "application/json" } })
+      .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+      .then(function (data) {
+        serverAvailable = !!(data && data.ok);
+        $("sendServerBtn").classList.toggle("hidden", !serverAvailable);
+      })
+      .catch(function () {
+        serverAvailable = false;
+        $("sendServerBtn").classList.add("hidden");
+      });
   }
 
   function registerWorker() {
@@ -789,13 +1674,18 @@
     });
   }
 
+  function tick() {
+    if (document.body.dataset.view !== "live") return;
+    var seg = runningSegment(currentSession());
+    var timer = $("runTimer");
+    if (timer && seg) timer.textContent = formatElapsed(seg.start);
+  }
+
+  fillEditTypes();
   load();
-  if (!state.setup.plannedStart) state.setup.plannedStart = toDatetimeLocal(new Date());
-  fillForm();
-  buildActivityGrid();
   bind();
-  renderAll();
+  render();
   probeServer();
   registerWorker();
-  setInterval(renderMeta, 1000);
+  setInterval(tick, 1000);
 })();

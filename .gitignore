@@ -1,4 +1,5 @@
 reports/*.txt
+reports/*.csv
 .DS_Store
 __pycache__/
 *.pyc

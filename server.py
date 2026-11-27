@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Session Script server.
 
-Serves the observer web app and collects reports as .txt files.
+Serves the observer web app and collects TXT and CSV reports.
 
 Usage (on a Mac, from this folder):
 
@@ -36,16 +36,21 @@ MAX_BODY = 1_000_000  # 1 MB
 SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._ -]+")
 
 
-def sanitize_filename(name: str) -> str:
+def sanitize_filename(name: str, extension: str = ".txt") -> str:
+    if not extension.startswith("."):
+        extension = "." + extension
     name = os.path.basename(unquote(name or "").replace("\\", "/"))
     name = SAFE_FILENAME.sub("", name).strip().strip(".")
     name = re.sub(r"\s+", " ", name)
-    if not name.lower().endswith(".txt"):
-        name = (name or "report") + ".txt"
-    if name in {".txt", "txt"} or len(name) < 5:
+    if name.lower().endswith(extension.lower()):
+        stem = name[: -len(extension)].strip().strip(".")
+    else:
+        stem = re.sub(r"\.(txt|csv)$", "", name, count=1, flags=re.IGNORECASE).strip().strip(".")
+    if not stem:
         stamp = datetime.now().strftime("%y%m%d %H%M%S")
-        name = f"{stamp} session observer.txt"
-    return name[:120]
+        stem = f"{stamp} session observer"
+    max_stem = max(1, 120 - len(extension))
+    return stem[:max_stem].strip() + extension
 
 
 def unique_path(directory: Path, filename: str) -> Path:
@@ -106,7 +111,14 @@ class Handler(SimpleHTTPRequestHandler):
             rel = path[len("/reports/") :]
             # Only files directly in reports/, no traversal.
             name = os.path.basename(rel)
-            if not name or name.startswith(".") or "/" in rel or "\\" in rel or rel != name:
+            if (
+                not name
+                or name.startswith(".")
+                or "/" in rel
+                or "\\" in rel
+                or rel != name
+                or not name.lower().endswith((".txt", ".csv"))
+            ):
                 self.send_error(404, "Not found")
                 return
             target = (REPORTS / name).resolve()
@@ -119,7 +131,8 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_error(404, "Not found")
                 return
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            media = "text/csv" if name.lower().endswith(".csv") else "text/plain"
+            self.send_header("Content-Type", f"{media}; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Content-Disposition", f'inline; filename="{name}"')
             self.send_header("Cache-Control", "no-store")
@@ -175,12 +188,34 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(500, {"ok": False, "error": f"Could not write file: {exc}"})
             return
 
-        self._json(200, {"ok": True, "filename": dest.name})
+        csv_saved = None
+        csv_text = data.get("csv")
+        if isinstance(csv_text, str) and csv_text.strip():
+            suggested_csv = data.get("csvFilename") or ""
+            if not isinstance(suggested_csv, str) or not suggested_csv.strip():
+                suggested_csv = filename[:-4] + ".csv" if filename.lower().endswith(".txt") else filename
+            csv_name = sanitize_filename(suggested_csv, ".csv")
+            dest_csv = unique_path(REPORTS, csv_name)
+            try:
+                dest_csv.write_text(csv_text, encoding="utf-8")
+            except OSError as exc:
+                self._json(500, {"ok": False, "error": f"Could not write spreadsheet: {exc}", "filename": dest.name})
+                return
+            csv_saved = dest_csv.name
+
+        payload = {"ok": True, "filename": dest.name}
+        if csv_saved:
+            payload["csvFilename"] = csv_saved
+        self._json(200, payload)
 
     def _reports_page(self) -> None:
         REPORTS.mkdir(parents=True, exist_ok=True)
         files = sorted(
-            (p for p in REPORTS.iterdir() if p.is_file() and p.suffix.lower() == ".txt"),
+            (
+                p
+                for p in REPORTS.iterdir()
+                if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in {".txt", ".csv"}
+            ),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )

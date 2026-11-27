@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Session Script">
-  <meta name="description" content="Timestamp what happens in a session or presentation. Built for observers at Meeting Design Institute events.">
+  <meta name="description" content="Time each part of a conference session. Session Script stays on your phone and exports a text report and a spreadsheet.">
   <title>Session Script</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
@@ -16,201 +16,292 @@
   <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 </head>
-<body>
+<body data-view="setup">
   <header class="app-header">
     <img class="logo" src="./icons/icon-192.png" width="40" height="40" alt="">
     <div class="brand">
       <h1>Session Script</h1>
       <p>Meeting Design Institute</p>
     </div>
-    <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
-      </svg>
-    </button>
+    <button type="button" class="header-btn" id="pastBtn">Past</button>
   </header>
 
   <main>
-    <section class="card" id="setupCard">
-      <div class="card-head">
-        <h2>Session setup</h2>
-        <button type="button" class="collapse-btn" id="setupToggle">Hide</button>
-      </div>
-      <div id="setupFields">
+    <section id="viewSetup">
+      <form id="setupForm" class="card" autocomplete="off">
+        <div class="card-head">
+          <h2>Session setup</h2>
+        </div>
+        <p class="lede">Time each part of the session. The log stays on this phone until you email it.</p>
         <div class="field">
           <label for="sessionTitle">Session title</label>
-          <input type="text" id="sessionTitle" name="sessionTitle" autocomplete="off" enterkeyhint="next" placeholder="e.g. Opening keynote">
+          <input type="text" id="sessionTitle" name="sessionTitle" autocomplete="off" enterkeyhint="next" placeholder="e.g. Opening keynote" required>
         </div>
         <div class="field">
-          <label for="speakers">Speakers</label>
-          <textarea id="speakers" name="speakers" rows="3" placeholder="One name per line"></textarea>
-          <p class="hint">Several speakers are fine — one name per line.</p>
+          <label for="speakers">Speaker name(s)</label>
+          <textarea id="speakers" name="speakers" rows="3" placeholder="One name per line" enterkeyhint="next"></textarea>
+          <p class="hint">One name per line. This is the room/speakers column in the spreadsheet.</p>
         </div>
         <div class="field">
-          <label for="plannedStart">Planned start time</label>
-          <input type="datetime-local" id="plannedStart" name="plannedStart">
-          <p class="hint">Defaults to now. Change it if the programme started earlier.</p>
+          <label for="plannedStart">Planned start</label>
+          <input type="datetime-local" id="plannedStart" name="plannedStart" required>
+          <p class="hint">Programme time. Activity buttons use the moment you tap, not this time.</p>
         </div>
         <div class="field">
           <label for="observer">Your name (observer)</label>
-          <input type="text" id="observer" name="observer" autocomplete="name" placeholder="Your name">
+          <input type="text" id="observer" name="observer" autocomplete="name" enterkeyhint="done" placeholder="Your name" required>
         </div>
-      </div>
+        <p class="form-error" id="setupError" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="startBtn">Start timing</button>
+      </form>
+      <p class="center-link"><button type="button" class="text-btn" id="setupPastBtn">Past sessions</button></p>
     </section>
 
-    <div class="meta" aria-live="polite">
-      <div class="meta-item">
-        <span class="k">Planned</span>
-        <span class="v" id="metaPlanned">—</span>
-      </div>
-      <div class="meta-item">
-        <span class="k">Actual start</span>
-        <span class="v" id="metaActual">—</span>
-      </div>
-      <div class="meta-item">
-        <span class="k">Elapsed</span>
-        <span class="v" id="metaElapsed">—</span>
-      </div>
-    </div>
+    <section id="viewLive">
+      <div class="strip" id="sessionStrip"></div>
+      <details class="card details" id="liveDetails">
+        <summary>Session details</summary>
+        <div class="field">
+          <label for="liveTitle">Session title</label>
+          <input type="text" id="liveTitle" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="liveSpeakers">Speaker name(s)</label>
+          <textarea id="liveSpeakers" rows="3" placeholder="One name per line"></textarea>
+        </div>
+        <div class="field">
+          <label for="livePlanned">Planned start</label>
+          <input type="datetime-local" id="livePlanned">
+        </div>
+        <div class="field">
+          <label for="liveObserver">Your name (observer)</label>
+          <input type="text" id="liveObserver" autocomplete="name">
+        </div>
+      </details>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>Activity log</h2>
-      </div>
-      <p class="log-empty" id="logEmpty">No activities yet. Tap Session Activity when something happens.</p>
-      <ol class="log-list" id="logList"></ol>
+      <section class="card running-card" id="runningCard" aria-live="polite"></section>
+
+      <section class="card grid-card">
+        <div class="card-head">
+          <h2>Activity</h2>
+        </div>
+        <p class="hint grid-hint">Tap to switch activity. A second tap on the same one is ignored for 2 seconds.</p>
+        <div class="activity-grid" id="activityGrid">
+          <button type="button" data-type="Introduction">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3Z"></path><path d="M6 19v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1"></path></svg>
+            Introduction
+          </button>
+          <button type="button" data-type="Presentation">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"></rect><path d="M8 20h8M12 16v4"></path></svg>
+            Presentation
+          </button>
+          <button type="button" data-type="Conversation">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5 4 19V7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5V12"></path><path d="M9 10h9.5A1.5 1.5 0 0 1 20 11.5V18l-2.2-1.5H10.5A1.5 1.5 0 0 1 9 15Z"></path></svg>
+            Conversation
+          </button>
+          <button type="button" data-type="Q&amp;A">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.7.3-1.2.9-1.2 1.6V14"></path><path d="M12 17h.01"></path></svg>
+            Q&amp;A
+          </button>
+          <button type="button" data-type="Participant question">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V7.5a2 2 0 0 1 4 0V11"></path><path d="M12 11V6.5a2 2 0 0 1 4 0V13"></path><path d="M8 11.5 6.8 13A4 4 0 0 0 10 20h5.2a3.5 3.5 0 0 0 3.4-2.6l.7-2.6A2 2 0 0 0 17.4 12H16"></path></svg>
+            Participant question
+          </button>
+          <button type="button" data-type="Survey">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="1.5"></rect><path d="M9 8h6M9 12h6M9 16h3"></path></svg>
+            Survey
+          </button>
+          <button type="button" data-type="Drawing">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 17.5 9.5 8 19H5v-3Z"></path><path d="M13 8 16 5l3 3-3 3"></path></svg>
+            Drawing
+          </button>
+          <button type="button" data-type="Other activity">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="18" cy="12" r="1.3"></circle></svg>
+            Other activity
+          </button>
+        </div>
+      </section>
+
+      <section class="card" id="logSection">
+        <div class="card-head">
+          <h2>Activity log</h2>
+        </div>
+        <p class="log-empty" id="logEmpty">No segments yet. Tap an activity when the session moves on. Duration shows after the segment ends.</p>
+        <ol class="log-list" id="logList"></ol>
+      </section>
     </section>
 
-    <section class="card" id="exportCard">
-      <div class="card-head">
-        <h2>Export &amp; share</h2>
-      </div>
-      <label class="label" for="reportPreview">Text report</label>
-      <textarea id="reportPreview" class="preview" readonly spellcheck="false" aria-label="Text report preview"></textarea>
-      <div class="export-grid" style="margin-top:12px">
-        <button type="button" class="btn btn-primary" id="saveTxtBtn">Save TXT</button>
-        <button type="button" class="btn" id="shareBtn">Share</button>
-        <button type="button" class="btn" id="whatsappBtn">WhatsApp</button>
-        <button type="button" class="btn" id="emailBtn">Email</button>
-        <button type="button" class="btn" id="copyBtn">Copy to clipboard</button>
-        <button type="button" class="btn hidden" id="sendServerBtn">Send to server</button>
-      </div>
-      <p class="status" id="exportStatus" role="status"></p>
+    <section id="viewReport">
+      <div class="card save-card" id="saveConfirm"></div>
+
+      <section class="card" id="exportCard">
+        <div class="card-head">
+          <h2>Send the files</h2>
+        </div>
+        <button type="button" class="btn btn-primary btn-block btn-email" id="emailMaartenBtn">Email to Maarten</button>
+        <p class="hint email-hint">Shares the CSV and the TXT with <strong>maarten.vanneste@meetingsupport.org</strong> in the title. If this phone cannot share files, Mail opens with the text report. Attach the CSV yourself.</p>
+        <div class="export-grid">
+          <button type="button" class="btn" id="saveTxtBtn">Save TXT</button>
+          <button type="button" class="btn" id="saveCsvBtn">Save CSV</button>
+          <button type="button" class="btn" id="shareBtn">Share</button>
+          <button type="button" class="btn" id="whatsappBtn">WhatsApp</button>
+          <button type="button" class="btn btn-block" id="copyBtn">Copy</button>
+          <button type="button" class="btn btn-block hidden" id="sendServerBtn">Send to server</button>
+        </div>
+        <p class="status" id="exportStatus" role="status"></p>
+      </section>
+
+      <section class="card" id="totalsCard"></section>
+
+      <section class="card" id="reportLogCard">
+        <div class="card-head">
+          <h2>Segments</h2>
+        </div>
+        <ol class="log-list" id="reportLog"></ol>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Text report</h2>
+        </div>
+        <textarea id="reportPreview" class="preview" readonly spellcheck="false" aria-label="Text report"></textarea>
+        <details class="csv-details">
+          <summary>Spreadsheet preview</summary>
+          <textarea id="csvPreview" class="preview" readonly spellcheck="false" aria-label="CSV preview"></textarea>
+        </details>
+      </section>
+
+      <button type="button" class="btn btn-block" id="reportNewBtn">New session</button>
+      <p class="hint center">The session you just finished stays in Past sessions.</p>
     </section>
 
-    <section class="card">
-      <button type="button" class="btn btn-danger span-2" id="newSessionBtn" style="width:100%">New session</button>
-      <p class="hint">Clears this session’s log and details. Your name and the coordinator email are kept.</p>
+    <section id="viewPast">
+      <div class="card-head page-head">
+        <h2>Past sessions</h2>
+      </div>
+      <p class="lede">Ended sessions stay on this phone. Open one to export it again or email it. Nothing is removed unless you delete that session.</p>
+      <button type="button" class="btn btn-primary btn-block" id="pastNewBtn">New session</button>
+      <div id="pastList"></div>
+      <p class="log-empty hidden" id="pastEmpty">No sessions on this phone yet.</p>
     </section>
   </main>
 
-  <div class="cta-wrap">
-    <button type="button" class="cta" id="activityBtn">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9"></circle>
-        <path d="M12 7v5l3 2"></path>
-      </svg>
-      Session Activity
-    </button>
+  <div class="live-footer" id="liveFooter">
+    <button type="button" class="btn btn-end" id="endSessionBtn">End session</button>
   </div>
 
-  <!-- Activity picker -->
-  <div class="modal-backdrop hidden" id="activityModal" role="dialog" aria-modal="true" aria-labelledby="activityModalTitle">
-    <div class="modal">
+  <div class="modal-backdrop hidden" id="otherModal" role="dialog" aria-modal="true" aria-labelledby="otherTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
       <div class="modal-top">
         <div>
-          <h2 id="activityModalTitle">What is happening?</h2>
-          <p class="stamp" id="activityStamp"></p>
+          <h2 id="otherTitle">Other activity</h2>
+          <p class="stamp">Starts at <strong id="otherStart"></strong></p>
         </div>
-        <button type="button" class="btn btn-ghost" id="activityCancel" style="min-height:44px;width:auto;padding:8px 12px">Cancel</button>
+        <button type="button" class="btn btn-ghost" id="otherCancel">Cancel</button>
       </div>
-      <div class="activity-grid" id="activityGrid"></div>
-      <div class="other-box hidden" id="otherBox">
-        <label for="otherText">Describe the activity</label>
-        <textarea id="otherText" rows="2" placeholder="e.g. Role play in groups"></textarea>
+      <div class="field">
+        <label for="otherText">What is happening?</label>
+        <textarea id="otherText" rows="2" placeholder="e.g. Role play in groups of four" data-autofocus></textarea>
       </div>
-      <div class="note-box">
-        <label for="activityNote">Optional note</label>
-        <textarea id="activityNote" rows="2" placeholder="Anything worth remembering"></textarea>
+      <div class="field">
+        <label for="otherGroup">Group size <span class="opt">(optional)</span></label>
+        <input type="number" id="otherGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
       </div>
-      <div class="modal-actions hidden" id="activityAddRow">
-        <button type="button" class="btn btn-primary span-2" id="activityAddBtn">Add activity</button>
+      <div class="field">
+        <label for="otherNote">Note <span class="opt">(optional)</span></label>
+        <textarea id="otherNote" rows="2" placeholder="e.g. Feedback from each group"></textarea>
       </div>
+      <button type="button" class="btn btn-primary btn-block" id="otherSave" disabled>Save details</button>
     </div>
   </div>
 
-  <!-- Edit entry -->
-  <div class="modal-backdrop hidden" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-    <div class="modal">
+  <div class="modal-backdrop hidden" id="endModal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
       <div class="modal-top">
         <div>
-          <h2 id="editModalTitle">Edit activity</h2>
+          <h2 id="endTitle">End session</h2>
+          <p class="required-pill">Required</p>
         </div>
-        <button type="button" class="btn btn-ghost" id="editCancel" style="min-height:44px;width:auto;padding:8px 12px">Cancel</button>
+        <button type="button" class="btn btn-ghost" id="endCancel">Cancel</button>
+      </div>
+      <p class="question" id="endQuestion">What happened after the speaker's closing announcement?</p>
+      <div class="choices" role="radiogroup" aria-labelledby="endQuestion">
+        <label class="choice"><input type="radio" name="closing" value="People left right away"> <span>People left right away</span></label>
+        <label class="choice"><input type="radio" name="closing" value="People stayed talking"> <span>People stayed talking</span></label>
+        <label class="choice"><input type="radio" name="closing" value="Mixed"> <span>Mixed</span></label>
+        <label class="choice"><input type="radio" name="closing" value="Other"> <span>Other</span></label>
+      </div>
+      <div class="field hidden" id="closingOtherWrap">
+        <label for="closingOther">Describe what happened</label>
+        <textarea id="closingOther" rows="2" placeholder="What people did after the closing announcement"></textarea>
       </div>
       <div class="field">
-        <label for="editTime">Time (HH:MM:SS)</label>
-        <input type="text" id="editTime" inputmode="numeric" placeholder="14:05:12" autocomplete="off">
+        <label for="closingComment">Comment <span class="opt">(optional)</span></label>
+        <textarea id="closingComment" rows="2" placeholder="Anything else the coordinator should know"></textarea>
       </div>
+      <p class="hint" id="endHint">Choose an answer to save this session. It cannot be saved without one.</p>
+      <button type="button" class="btn btn-primary btn-block" id="endConfirmBtn" disabled>End session and save</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="modal-top">
+        <div>
+          <h2 id="editTitle">Edit segment</h2>
+          <p class="stamp">Started <strong id="editStart"></strong> · <span id="editDuration"></span></p>
+        </div>
+        <button type="button" class="btn btn-ghost" id="editCancel">Cancel</button>
+      </div>
+      <p class="hint">Editing does not change the start time.</p>
       <div class="field">
         <label for="editType">Activity</label>
-        <select id="editType" style="width:100%;min-height:48px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff"></select>
+        <select id="editType"></select>
       </div>
-      <div class="field hidden" id="editOtherBox">
-        <label for="editOther">Describe the activity</label>
+      <div class="field hidden" id="editOtherWrap">
+        <label for="editOther">What was happening?</label>
         <textarea id="editOther" rows="2"></textarea>
       </div>
+      <div class="field hidden" id="editGroupWrap">
+        <label for="editGroup">Group size <span class="opt">(optional)</span></label>
+        <input type="number" id="editGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
+      </div>
       <div class="field">
-        <label for="editNote">Note</label>
+        <label for="editNote">Note <span class="opt">(optional)</span></label>
         <textarea id="editNote" rows="2"></textarea>
       </div>
+      <button type="button" class="btn btn-primary btn-block" id="editSave">Save segment</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 id="deleteTitle">Delete this session?</h2>
+      <p id="deleteBody"></p>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger" id="editDelete">Delete</button>
-        <button type="button" class="btn btn-primary" id="editSave">Save</button>
+        <button type="button" class="btn" id="deleteKeep">Keep</button>
+        <button type="button" class="btn btn-danger" id="deleteConfirm">Delete session</button>
       </div>
     </div>
   </div>
 
-  <!-- Settings -->
-  <div class="modal-backdrop hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <div class="modal">
-      <div class="modal-top">
-        <div>
-          <h2 id="settingsTitle">Settings</h2>
-        </div>
-        <button type="button" class="btn btn-ghost" id="settingsClose" style="min-height:44px;width:auto;padding:8px 12px">Close</button>
-      </div>
-      <div class="field">
-        <label for="coordinatorEmail">Coordinator email</label>
-        <input type="email" id="coordinatorEmail" autocomplete="email" placeholder="maarten.vanneste@meetingsupport.org">
-        <p class="hint">Used for the Email button. Default is Maarten’s meetingsupport.org address.</p>
-      </div>
-      <p class="hint" id="serverHint">Send to server is available only when this app is opened from the Session Script server on the venue Wi-Fi.</p>
+  <div class="modal-backdrop hidden" id="newModal" role="dialog" aria-modal="true" aria-labelledby="newTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 id="newTitle">Start another session?</h2>
+      <p>The current session stays on this phone in Past sessions. Nothing is deleted.</p>
       <div class="modal-actions">
-        <button type="button" class="btn btn-primary span-2" id="settingsSave">Save settings</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Confirm new session -->
-  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-    <div class="modal">
-      <div class="modal-top">
-        <div>
-          <h2 id="confirmTitle">Start a new session?</h2>
-        </div>
-      </div>
-      <p>This clears the current log, title, speakers and start time. Your name and the coordinator email are kept.</p>
-      <div class="modal-actions">
-        <button type="button" class="btn" id="confirmNo">Cancel</button>
-        <button type="button" class="btn btn-danger" id="confirmYes">Start new session</button>
+        <button type="button" class="btn" id="newCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="newConfirm">New session</button>
       </div>
     </div>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
   <script src="./app.js" defer></script>
 </body>
 </html>
