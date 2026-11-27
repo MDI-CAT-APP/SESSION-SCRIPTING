@@ -27,6 +27,7 @@ COLUMNS = [
     "session",
     "observer",
     "estimated_participants",
+    "room_name",
     "room_speakers",
     "source_file",
     "segment_type",
@@ -57,8 +58,8 @@ SEGMENT_TYPES = [
     "Q&A",
     "Participant question",
     "Survey",
-    "Drawing",
     "Closing remarks",
+    "Other: Drawing",
     "Other activity",
 ]
 
@@ -67,10 +68,20 @@ BUCKETS = [
     ("Conversation", ["Conversation"]),
     ("Q&A (incl. participant questions)", ["Q&A", "Participant question"]),
     ("Survey", ["Survey"]),
-    ("Drawing", ["Drawing"]),
     ("Closing remarks", ["Closing remarks"]),
-    ("Other", ["Other activity"]),
+    ("Other", ["Other activity", "Other: Drawing", "Drawing"]),
 ]
+
+
+def canonical_segment_type(row: dict[str, str]) -> str:
+    """Old Drawing rows, and Other activity labelled Drawing, stay readable."""
+    name = (row.get("segment_type") or "").strip()
+    note = (row.get("note") or "").strip()
+    if name == "Drawing" or name == "Other: Drawing":
+        return "Other: Drawing"
+    if name == "Other activity" and (note == "Drawing" or note.startswith("Drawing - ")):
+        return "Other: Drawing"
+    return name
 
 
 def bucket_for(segment_type: str) -> str:
@@ -198,6 +209,14 @@ class Bucket:
 PLENARY_WORDS = {"plenary", "whole room", "plenary/whole room"}
 
 
+def room_name_from_rows(rows: list[dict[str, str]]) -> str:
+    for row in rows:
+        name = (row.get("room_name") or "").strip()
+        if name:
+            return name
+    return ""
+
+
 def participants_from_rows(rows: list[dict[str, str]]) -> str:
     for row in rows:
         raw = (row.get("estimated_participants") or "").strip()
@@ -281,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
                     "observer": observer,
                     "room": room,
                     "participants": participants_from_rows(group_rows),
+                    "room_name": room_name_from_rows(group_rows),
                     "source": path.name,
                     "rows": group_rows,
                 }
@@ -309,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
             seconds = parse_seconds(str(row.get("duration_seconds", "")))
             if seconds is None:
                 continue
-            segment_type = str(row.get("segment_type", ""))
+            segment_type = canonical_segment_type(row)
             group, plenary = group_from_row(row)
             by_type[segment_type].add(seconds, group, plenary)
             by_bucket[bucket_for(segment_type)].add(seconds, group, plenary)
@@ -329,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
                 "observer": session["observer"],
                 "room": session["room"],
                 "participants": session["participants"],
+                "room_name": session.get("room_name", ""),
                 "source": session["source"],
                 "total": total,
                 "groups": groups,
@@ -392,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
             observer=session["observer"],
             room_speakers=session["room"],
             estimated_participants=session["participants"],
+            room_name=session.get("room_name", ""),
             source_file=session["source"],
             count=session["count"],
             total_duration_seconds=session["total"],

@@ -16,7 +16,6 @@
     "Q&A",
     "Participant question",
     "Survey",
-    "Drawing",
     "Closing remarks",
     "Other activity"
   ];
@@ -26,7 +25,6 @@
     { id: "conversation", label: "Conversation", types: ["Conversation"] },
     { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
     { id: "survey", label: "Survey", types: ["Survey"] },
-    { id: "drawing", label: "Drawing", types: ["Drawing"] },
     { id: "closing", label: "Closing remarks", types: ["Closing remarks"] },
     { id: "other", label: "Other", types: ["Other activity"] }
   ];
@@ -42,6 +40,7 @@
     "session",
     "observer",
     "estimated_participants",
+    "room_name",
     "room_speakers",
     "segment_type",
     "start",
@@ -61,7 +60,6 @@
     "Conversation": "Conversation",
     "Q&A": "Q&A",
     "Survey": "Survey",
-    "Drawing": "Drawing",
     "Other activity": "Other activity"
   };
 
@@ -267,6 +265,7 @@
       plannedStart: toDatetimeLocal(now),
       observer: observer || "",
       estimatedParticipants: null,
+      roomName: "",
       status: "setup",
       segments: [],
       closing: null,
@@ -316,6 +315,7 @@
     if ((session.title || "").trim()) return false;
     if ((session.speakers || "").trim()) return false;
     if (session.estimatedParticipants != null) return false;
+    if ((session.roomName || "").trim()) return false;
     if (session.closing) return false;
     return true;
   }
@@ -497,6 +497,7 @@
         csvCell(session.title || ""),
         csvCell(session.observer || ""),
         session.estimatedParticipants == null ? "" : String(session.estimatedParticipants),
+        csvCell(session.roomName || ""),
         csvCell(room),
         csvCell(seg.type),
         csvCell(seg.start ? formatStamp(new Date(seg.start)) : ""),
@@ -542,6 +543,7 @@
       "Meeting Design Institute",
       "",
       "Session: " + (session.title || "—"),
+      "Room: " + ((session.roomName || "").trim() || "—"),
       "Speakers: " + (speakersList(session).join(", ") || "—"),
       "Observer: " + (session.observer || "—"),
       "Estimated participants: " + (session.estimatedParticipants == null ? "—" : String(session.estimatedParticipants)),
@@ -599,8 +601,10 @@
 
   function normalizeSegment(raw) {
     if (!raw || typeof raw !== "object" || !raw.start) return null;
-    var type = ACTIVITY_TYPES.indexOf(raw.type) === -1 ? "Other activity" : raw.type;
+    var legacyDrawing = raw.type === "Drawing";
+    var type = legacyDrawing || ACTIVITY_TYPES.indexOf(raw.type) === -1 ? "Other activity" : raw.type;
     var otherLabel = (raw.otherLabel || "").trim();
+    if (legacyDrawing && !otherLabel) otherLabel = "Drawing";
     if (type === "Other activity" && raw.type !== "Other activity" && !otherLabel) otherLabel = String(raw.type || "");
     var storedSize = parseGroupSize(raw.groupSize);
     var avg = normalizeGroupAvg(raw.groupSizeAvg, storedSize);
@@ -649,6 +653,7 @@
     session.plannedStart = raw.plannedStart || session.plannedStart;
     session.observer = raw.observer || "";
     session.estimatedParticipants = parseParticipants(raw.estimatedParticipants);
+    session.roomName = raw.roomName || "";
     session.status = raw.status === "ended" || raw.status === "live" ? raw.status : "setup";
     session.segments = Array.isArray(raw.segments) ? raw.segments.map(normalizeSegment).filter(Boolean) : [];
     session.closing = normalizeClosing(raw.closing);
@@ -818,6 +823,7 @@
     session.plannedStart = $("plannedStart").value;
     session.observer = $("observer").value;
     session.estimatedParticipants = parseParticipants($("participants").value);
+    session.roomName = $("roomName").value;
     session.updatedAt = new Date().toISOString();
     save();
     return session;
@@ -877,6 +883,35 @@
     buzz();
   }
 
+  function markOtherQuick(containerId, value) {
+    var box = $(containerId);
+    if (!box) return;
+    var chips = box.querySelectorAll("[data-other-quick]");
+    for (var i = 0; i < chips.length; i++) {
+      if (chips[i].getAttribute("data-other-quick") === value) chips[i].setAttribute("aria-pressed", "true");
+      else chips[i].removeAttribute("aria-pressed");
+    }
+  }
+
+  function bindOtherQuick(containerId, fieldId, saveId) {
+    var box = $(containerId);
+    if (!box) return;
+    box.addEventListener("click", function (ev) {
+      var chip = ev.target.closest("[data-other-quick]");
+      if (!chip || !box.contains(chip)) return;
+      var label = chip.getAttribute("data-other-quick");
+      var field = $(fieldId);
+      if (chip.getAttribute("aria-pressed") === "true") {
+        if (field.value.trim() === label) field.value = "";
+        chip.removeAttribute("aria-pressed");
+      } else {
+        field.value = label;
+        markOtherQuick(containerId, label);
+      }
+      if (saveId && $(saveId)) $(saveId).disabled = !field.value.trim();
+    });
+  }
+
   function openOther(when) {
     pendingOtherAt = when;
     $("otherStart").textContent = formatHMS(when);
@@ -884,6 +919,7 @@
     $("otherGroup").value = "";
     $("otherNote").value = "";
     $("otherSave").disabled = true;
+    markOtherQuick("otherQuick", "");
     openModal("otherModal");
     buzz();
   }
@@ -1293,6 +1329,7 @@
       current.title = "";
       current.speakers = "";
       current.estimatedParticipants = null;
+      current.roomName = "";
       current.updatedAt = new Date().toISOString();
       state.screen = null;
       exportNote = { text: "", error: false };
@@ -1352,7 +1389,7 @@
   }
 
   function showPast() {
-    if (document.body.dataset.view === "setup" && ($("sessionTitle").value || $("observer").value || $("speakers").value || $("participants").value)) {
+    if (document.body.dataset.view === "setup" && ($("sessionTitle").value || $("observer").value || $("speakers").value || $("participants").value || $("roomName").value)) {
       persistSetupFromForm();
     }
     if (document.body.dataset.view === "live") {
@@ -1383,11 +1420,17 @@
     return bits.length ? " · " + bits.join(" · ") : "";
   }
 
+  function liveLength(startIso) {
+    var ms = Date.now() - new Date(startIso).getTime();
+    var total = !isFinite(ms) || ms < 0 ? 0 : Math.floor(ms / 1000);
+    return formatSeconds(total);
+  }
+
   function segmentItemHtml(seg) {
     var ended = !!seg.end;
     var badge = ended
       ? '<span class="dur">' + escapeHtml(formatSeconds(segmentSeconds(seg))) + "</span>"
-      : '<span class="dur dur-live" data-live-start="' + escapeHtml(seg.start) + '">' + escapeHtml(formatElapsed(seg.start)) + "</span>";
+      : '<span class="dur" data-live-start="' + escapeHtml(seg.start) + '">' + escapeHtml(liveLength(seg.start)) + "</span>";
     var suffix = logSuffix(seg);
     return '<li class="log-item" data-id="' + escapeHtml(seg.id) + '" data-type="' + escapeHtml(seg.type) + '" data-running="' + (ended ? "false" : "true") + '" data-seconds="' + (ended ? String(segmentSeconds(seg)) : "") + '">' +
       '<button type="button" class="log-line" data-edit="' + escapeHtml(seg.id) + '">' +
@@ -1547,7 +1590,7 @@
       '<div class="session-top"><h3>' + escapeHtml(session.title || "Untitled session") + '</h3>' +
       '<span class="badge ' + badgeClass + '">' + badgeText + "</span></div>" +
       '<p class="session-meta">' + escapeHtml(formatDateShort(sessionDate(session)) + " · " + (session.observer || "No observer name")) + "</p>" +
-      '<p class="session-meta">' + escapeHtml(formatSeconds(sessionSeconds(session)) + (speakers ? " · " + speakers : "") + (session.estimatedParticipants == null ? "" : " · " + session.estimatedParticipants + " participants")) + "</p>" +
+      '<p class="session-meta">' + escapeHtml([formatSeconds(sessionSeconds(session)), (session.roomName || "").trim(), speakers, session.estimatedParticipants == null ? "" : session.estimatedParticipants + " participants"].filter(Boolean).join(" · ")) + "</p>" +
       '<div class="session-actions' + (showEmail ? "" : " two") + '">' +
       '<button type="button" class="btn" data-open>Open</button>' + email +
       '<button type="button" class="btn btn-danger" data-delete>Delete</button></div></article>';
@@ -1559,19 +1602,22 @@
       speakers: "",
       plannedStart: toDatetimeLocal(new Date()),
       observer: lastObserver(),
-      estimatedParticipants: null
+      estimatedParticipants: null,
+      roomName: ""
     };
     setIdle("sessionTitle", model.title);
     setIdle("speakers", model.speakers);
     setIdle("plannedStart", model.plannedStart || toDatetimeLocal(new Date()));
     setIdle("observer", model.observer);
     setIdle("participants", model.estimatedParticipants == null ? "" : String(model.estimatedParticipants));
+    setIdle("roomName", model.roomName || "");
   }
 
   function renderLive(session) {
     renderStrip(session);
     setIdle("liveTitle", session.title);
     setIdle("liveSpeakers", session.speakers);
+    setIdle("liveRoomName", session.roomName || "");
     setIdle("livePlanned", session.plannedStart);
     setIdle("liveObserver", session.observer);
     setIdle("liveParticipants", session.estimatedParticipants == null ? "" : String(session.estimatedParticipants));
@@ -1626,6 +1672,7 @@
     editingId = id;
     $("editType").value = seg.type;
     $("editOther").value = seg.otherLabel || "";
+    markOtherQuick("editQuick", seg.otherLabel || "");
     $("editGroup").value = seg.groupSize == null ? "" : String(seg.groupSize);
     showGroupAvg("editChips", "editGroupCustom", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
     $("editNote").value = seg.note || "";
@@ -1743,6 +1790,7 @@
     if (!session) return;
     session.title = $("liveTitle").value;
     session.speakers = $("liveSpeakers").value;
+    session.roomName = $("liveRoomName").value;
     session.plannedStart = $("livePlanned").value;
     session.observer = $("liveObserver").value;
     session.estimatedParticipants = parseParticipants($("liveParticipants").value);
@@ -1760,6 +1808,7 @@
     session.plannedStart = $("plannedStart").value || toDatetimeLocal(new Date());
     session.observer = $("observer").value.trim();
     session.estimatedParticipants = parseParticipants($("participants").value);
+    session.roomName = $("roomName").value.trim();
     if (!session.title) {
       $("setupError").textContent = "Add a session title.";
       $("sessionTitle").focus();
@@ -1789,7 +1838,7 @@
 
   function bind() {
     $("setupForm").addEventListener("submit", startTiming);
-    ["sessionTitle", "speakers", "plannedStart", "observer", "participants"].forEach(function (id) {
+    ["sessionTitle", "speakers", "roomName", "plannedStart", "observer", "participants"].forEach(function (id) {
       $(id).addEventListener("input", function () {
         $("setupError").textContent = "";
         persistSetupFromForm();
@@ -1799,7 +1848,7 @@
     $("setupPastBtn").addEventListener("click", showPast);
     $("pastBtn").addEventListener("click", togglePast);
 
-    ["liveTitle", "liveSpeakers", "livePlanned", "liveObserver", "liveParticipants"].forEach(function (id) {
+    ["liveTitle", "liveSpeakers", "liveRoomName", "livePlanned", "liveObserver", "liveParticipants"].forEach(function (id) {
       $(id).addEventListener("input", onLiveDetails);
       $(id).addEventListener("change", onLiveDetails);
     });
@@ -1815,7 +1864,13 @@
 
     $("otherText").addEventListener("input", function () {
       $("otherSave").disabled = !$("otherText").value.trim();
+      markOtherQuick("otherQuick", $("otherText").value.trim());
     });
+    bindOtherQuick("otherQuick", "otherText", "otherSave");
+    $("editOther").addEventListener("input", function () {
+      markOtherQuick("editQuick", $("editOther").value.trim());
+    });
+    bindOtherQuick("editQuick", "editOther");
     $("otherSave").addEventListener("click", confirmOther);
     $("otherCancel").addEventListener("click", cancelOther);
     $("noteSkip").addEventListener("click", skipNoteSheet);
@@ -1954,7 +2009,7 @@
     var timer = $("runTimer");
     if (timer) timer.textContent = label;
     var badges = document.querySelectorAll("[data-live-start]");
-    for (var i = 0; i < badges.length; i++) badges[i].textContent = label;
+    for (var i = 0; i < badges.length; i++) badges[i].textContent = liveLength(badges[i].getAttribute("data-live-start"));
   }
 
   fillEditTypes();

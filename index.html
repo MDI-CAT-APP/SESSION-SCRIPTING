@@ -43,6 +43,10 @@
           <p class="hint">One name per line. This is the room/speakers column in the spreadsheet.</p>
         </div>
         <div class="field">
+          <label for="roomName">Room name</label>
+          <input type="text" id="roomName" name="roomName" autocomplete="off" enterkeyhint="next" placeholder="e.g. Hall 2">
+        </div>
+        <div class="field">
           <label for="plannedStart">Planned start</label>
           <input type="datetime-local" id="plannedStart" name="plannedStart" required>
           <p class="hint">Programme time. Activity buttons use the moment you tap, not this time.</p>
@@ -72,6 +76,10 @@
         <div class="field">
           <label for="liveSpeakers">Speaker name(s)</label>
           <textarea id="liveSpeakers" rows="3" placeholder="One name per line"></textarea>
+        </div>
+        <div class="field">
+          <label for="liveRoomName">Room name</label>
+          <input type="text" id="liveRoomName" autocomplete="off" placeholder="e.g. Hall 2">
         </div>
         <div class="field">
           <label for="livePlanned">Planned start</label>
@@ -118,10 +126,6 @@
           <button type="button" data-type="Survey">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="1.5"></rect><path d="M9 8h6M9 12h6M9 16h3"></path></svg>
             Survey
-          </button>
-          <button type="button" data-type="Drawing">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 17.5 9.5 8 19H5v-3Z"></path><path d="M13 8 16 5l3 3-3 3"></path></svg>
-            Drawing
           </button>
           <button type="button" data-type="Closing remarks">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v16"></path><path d="M6 5h10l-2.2 3L16 11H6"></path></svg>
@@ -214,6 +218,9 @@
       </div>
       <div class="field">
         <label for="otherText">What is happening?</label>
+        <div class="chip-row" id="otherQuick">
+          <button type="button" class="chip" data-other-quick="Drawing">Drawing</button>
+        </div>
         <textarea id="otherText" rows="2" placeholder="e.g. Role play in groups of four" data-autofocus></textarea>
       </div>
       <div class="field">
@@ -309,6 +316,9 @@
       </div>
       <div class="field hidden" id="editOtherWrap">
         <label for="editOther">What was happening?</label>
+        <div class="chip-row" id="editQuick">
+          <button type="button" class="chip" data-other-quick="Drawing">Drawing</button>
+        </div>
         <textarea id="editOther" rows="2"></textarea>
       </div>
       <div class="field hidden" id="editGroupWrap">

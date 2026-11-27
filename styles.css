@@ -485,21 +485,37 @@ input:focus, textarea:focus, select:focus {
   color: #fffefb;
 }
 
+#logSection,
+#reportLogCard {
+  padding: 6px 10px 4px;
+}
+
+#logSection .card-head,
+#reportLogCard .card-head {
+  margin-bottom: 2px;
+}
+
 .log-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.15;
 }
 
 .log-empty {
   margin: 0;
-  padding: 8px 2px 4px;
+  padding: 2px 0 4px;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.15;
 }
 
 .log-item {
   display: block;
+  margin: 0;
   padding: 0;
   border-top: 1px solid var(--line);
   scroll-margin-top: 80px;
@@ -510,48 +526,48 @@ input:focus, textarea:focus, select:focus {
 .log-line {
   appearance: none;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
-  padding: 4px 0;
+  min-height: 0;
+  margin: 0;
+  padding: 1px 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   text-align: left;
-  font-weight: 750;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.log-name,
+.log-suffix,
+.log-line .dur {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
 }
 
 .log-name {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--ink);
 }
 
-.log-suffix {
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-.dur {
+.log-line .dur {
   flex: 0 0 auto;
-  justify-self: end;
-  align-self: center;
-  background: var(--teal-soft);
-  color: var(--teal-deep);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-weight: 800;
-  font-size: 0.82rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.dur-live {
-  background: var(--copper-soft);
-  color: var(--copper-deep);
 }
 
 .linkish {
