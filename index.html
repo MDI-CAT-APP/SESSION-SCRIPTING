@@ -247,7 +247,6 @@
           <h2 id="noteTitle">Add a note</h2>
           <p class="stamp">Starts at <strong id="noteStart"></strong></p>
         </div>
-        <button type="button" class="btn btn-ghost" id="noteSkip">Skip</button>
       </div>
       <p class="hint" id="noteHint">This line has started. Add a note now, or skip and add one later.</p>
       <div id="noteGroupWrap" class="field hidden">
@@ -264,7 +263,10 @@
         <label for="noteText">Note <span class="opt">(optional)</span></label>
         <textarea id="noteText" rows="2" placeholder="Anything worth remembering" data-autofocus></textarea>
       </div>
-      <button type="button" class="btn btn-primary btn-block" id="noteSave">Save note</button>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="noteSkip">Skip</button>
+        <button type="button" class="btn btn-primary" id="noteSave">Save note</button>
+      </div>
     </div>
   </div>
 
