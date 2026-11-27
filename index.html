@@ -49,7 +49,11 @@
         </div>
         <div class="field">
           <label for="observer">Your name (observer)</label>
-          <input type="text" id="observer" name="observer" autocomplete="name" enterkeyhint="done" placeholder="Your name" required>
+          <input type="text" id="observer" name="observer" autocomplete="name" enterkeyhint="next" placeholder="Your name" required>
+        </div>
+        <div class="field">
+          <label for="participants">Estimated nr of participants <span class="opt">(optional)</span></label>
+          <input type="number" id="participants" name="participants" inputmode="numeric" min="0" max="99999" step="1" enterkeyhint="done" placeholder="e.g. 80">
         </div>
         <p class="form-error" id="setupError" role="alert"></p>
         <button type="submit" class="btn btn-primary btn-block" id="startBtn">Start timing</button>
@@ -76,6 +80,10 @@
         <div class="field">
           <label for="liveObserver">Your name (observer)</label>
           <input type="text" id="liveObserver" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="liveParticipants">Estimated nr of participants <span class="opt">(optional)</span></label>
+          <input type="number" id="liveParticipants" inputmode="numeric" min="0" max="99999" step="1" placeholder="e.g. 80">
         </div>
       </details>
 
@@ -114,6 +122,10 @@
           <button type="button" data-type="Drawing">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 17.5 9.5 8 19H5v-3Z"></path><path d="M13 8 16 5l3 3-3 3"></path></svg>
             Drawing
+          </button>
+          <button type="button" data-type="Closing remarks">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v16"></path><path d="M6 5h10l-2.2 3L16 11H6"></path></svg>
+            Closing remarks
           </button>
           <button type="button" data-type="Other activity">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="18" cy="12" r="1.3"></circle></svg>
@@ -216,6 +228,40 @@
     </div>
   </div>
 
+  <div class="modal-backdrop hidden" id="noteModal" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="modal-top">
+        <div>
+          <h2 id="noteTitle">Add a note</h2>
+          <p class="stamp">Starts at <strong id="noteStart"></strong></p>
+        </div>
+        <button type="button" class="btn btn-ghost" id="noteSkip">Skip</button>
+      </div>
+      <p class="hint" id="noteHint">This line has started. Add a note now, or skip and add one later.</p>
+      <div id="noteGroupWrap" class="field hidden">
+        <label>Group size avg <span class="opt">(optional)</span></label>
+        <div class="chip-row" id="noteChips">
+          <button type="button" class="chip" data-chip="2">2</button>
+          <button type="button" class="chip" data-chip="3">3</button>
+          <button type="button" class="chip" data-chip="4">4</button>
+          <button type="button" class="chip" data-chip="5">5</button>
+          <button type="button" class="chip" data-chip="6">6</button>
+          <button type="button" class="chip" data-chip="8">8</button>
+          <button type="button" class="chip" data-chip="plenary">Plenary</button>
+        </div>
+        <p class="hint">Plenary means the whole room. Or type another number.</p>
+        <label for="noteGroupCustom">Custom number</label>
+        <input type="number" id="noteGroupCustom" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 7">
+      </div>
+      <div class="field">
+        <label for="noteText">Note <span class="opt">(optional)</span></label>
+        <textarea id="noteText" rows="2" placeholder="Anything worth remembering" data-autofocus></textarea>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="noteSave">Save note</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop hidden" id="endModal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
     <div class="modal" tabindex="-1">
       <div class="sheet-handle" aria-hidden="true"></div>
@@ -269,11 +315,27 @@
         <label for="editGroup">Group size <span class="opt">(optional)</span></label>
         <input type="number" id="editGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
       </div>
+      <div class="field hidden" id="editAvgWrap">
+        <label>Group size avg <span class="opt">(optional)</span></label>
+        <div class="chip-row" id="editChips">
+          <button type="button" class="chip" data-chip="2">2</button>
+          <button type="button" class="chip" data-chip="3">3</button>
+          <button type="button" class="chip" data-chip="4">4</button>
+          <button type="button" class="chip" data-chip="5">5</button>
+          <button type="button" class="chip" data-chip="6">6</button>
+          <button type="button" class="chip" data-chip="8">8</button>
+          <button type="button" class="chip" data-chip="plenary">Plenary</button>
+        </div>
+        <p class="hint">Plenary means the whole room. Or type another number.</p>
+        <label for="editGroupCustom">Custom number</label>
+        <input type="number" id="editGroupCustom" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 7">
+      </div>
       <div class="field">
         <label for="editNote">Note <span class="opt">(optional)</span></label>
         <textarea id="editNote" rows="2"></textarea>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="editSave">Save segment</button>
+      <button type="button" class="btn btn-danger btn-block" id="editDelete">Delete line</button>
     </div>
   </div>
 
@@ -285,6 +347,18 @@
       <div class="modal-actions">
         <button type="button" class="btn" id="deleteKeep">Keep</button>
         <button type="button" class="btn btn-danger" id="deleteConfirm">Delete session</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="lineDeleteModal" role="dialog" aria-modal="true" aria-labelledby="lineDeleteTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 id="lineDeleteTitle">Delete this line?</h2>
+      <p id="lineDeleteBody"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="lineDeleteKeep">Keep</button>
+        <button type="button" class="btn btn-danger" id="lineDeleteConfirm">Delete line</button>
       </div>
     </div>
   </div>

@@ -4,7 +4,7 @@
 Each phone exports one CSV per session, with the same columns:
 
     session, observer, room_speakers, segment_type, start, end,
-    duration_seconds, group_size, note
+    duration_seconds, group_size, group_size_avg, note
 
 This tool reads every CSV in a folder and writes one summary workbook
 (a CSV that Excel opens). It does not need any packages beyond Python 3.
@@ -26,6 +26,7 @@ COLUMNS = [
     "section",
     "session",
     "observer",
+    "estimated_participants",
     "room_speakers",
     "source_file",
     "segment_type",
@@ -34,6 +35,7 @@ COLUMNS = [
     "average_duration_seconds",
     "share_of_time_percent",
     "average_group_size",
+    "plenary_count",
     "session_total_seconds",
 ]
 
@@ -45,7 +47,6 @@ REQUIRED = {
     "start",
     "end",
     "duration_seconds",
-    "group_size",
     "note",
 }
 
@@ -57,6 +58,7 @@ SEGMENT_TYPES = [
     "Participant question",
     "Survey",
     "Drawing",
+    "Closing remarks",
     "Other activity",
 ]
 
@@ -66,6 +68,7 @@ BUCKETS = [
     ("Q&A (incl. participant questions)", ["Q&A", "Participant question"]),
     ("Survey", ["Survey"]),
     ("Drawing", ["Drawing"]),
+    ("Closing remarks", ["Closing remarks"]),
     ("Other", ["Other activity"]),
 ]
 
@@ -161,7 +164,7 @@ def _rows_from_reader(reader: csv.DictReader) -> list[dict[str, str]]:
     if not reader.fieldnames:
         raise ValueError("missing header")
     headers = {norm_header(name) for name in reader.fieldnames}
-    if not REQUIRED.issubset(headers):
+    if not REQUIRED.issubset(headers) or not ({"group_size", "group_size_avg"} & headers):
         raise ValueError("not a Session Script export")
     rows: list[dict[str, str]] = []
     for raw in reader:
@@ -181,12 +184,43 @@ class Bucket:
         self.count = 0
         self.seconds = 0
         self.groups: list[int] = []
+        self.plenary = 0
 
-    def add(self, seconds: int, group: int | None) -> None:
+    def add(self, seconds: int, group: int | None, plenary: bool = False) -> None:
         self.count += 1
         self.seconds += seconds
         if group is not None:
             self.groups.append(group)
+        if plenary:
+            self.plenary += 1
+
+
+PLENARY_WORDS = {"plenary", "whole room", "plenary/whole room"}
+
+
+def participants_from_rows(rows: list[dict[str, str]]) -> str:
+    for row in rows:
+        raw = (row.get("estimated_participants") or "").strip()
+        if not raw:
+            continue
+        try:
+            count = int(round(float(raw)))
+        except ValueError:
+            continue
+        if count >= 0:
+            return str(count)
+    return ""
+
+
+def group_from_row(row: dict[str, str]) -> tuple[int | None, bool]:
+    avg = (row.get("group_size_avg") or "").strip().lower()
+    if avg in PLENARY_WORDS:
+        return None, True
+    if avg:
+        size = parse_group(avg)
+        if size is not None:
+            return size, False
+    return parse_group(row.get("group_size") or ""), False
 
 
 def ordered_types(found: dict[str, Bucket]) -> list[str]:
@@ -246,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
                     "title": title,
                     "observer": observer,
                     "room": room,
+                    "participants": participants_from_rows(group_rows),
                     "source": path.name,
                     "rows": group_rows,
                 }
@@ -261,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     overall_buckets: dict[str, Bucket] = defaultdict(Bucket)
     grand_seconds = 0
     grand_groups: list[int] = []
+    grand_plenary = 0
     session_stats = []
 
     for session in sessions:
@@ -268,29 +304,35 @@ def main(argv: list[str] | None = None) -> int:
         by_bucket: dict[str, Bucket] = defaultdict(Bucket)
         total = 0
         groups: list[int] = []
+        plenary_count = 0
         for row in session["rows"]:  # type: ignore[index]
             seconds = parse_seconds(str(row.get("duration_seconds", "")))
             if seconds is None:
                 continue
             segment_type = str(row.get("segment_type", ""))
-            group = parse_group(str(row.get("group_size", "")))
-            by_type[segment_type].add(seconds, group)
-            by_bucket[bucket_for(segment_type)].add(seconds, group)
-            overall[segment_type].add(seconds, group)
-            overall_buckets[bucket_for(segment_type)].add(seconds, group)
+            group, plenary = group_from_row(row)
+            by_type[segment_type].add(seconds, group, plenary)
+            by_bucket[bucket_for(segment_type)].add(seconds, group, plenary)
+            overall[segment_type].add(seconds, group, plenary)
+            overall_buckets[bucket_for(segment_type)].add(seconds, group, plenary)
             total += seconds
             if group is not None:
                 groups.append(group)
                 grand_groups.append(group)
+            if plenary:
+                plenary_count += 1
+                grand_plenary += 1
         grand_seconds += total
         session_stats.append(
             {
                 "title": session["title"],
                 "observer": session["observer"],
                 "room": session["room"],
+                "participants": session["participants"],
                 "source": session["source"],
                 "total": total,
                 "groups": groups,
+                "plenary": plenary_count,
                 "by_type": by_type,
                 "count": sum(bucket.count for bucket in by_type.values()),
             }
@@ -317,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
             average_duration_seconds=average_seconds(bucket.seconds, bucket.count),
             share_of_time_percent=share,
             average_group_size=average_group(bucket.groups),
+            plenary_count=bucket.plenary,
             session_total_seconds=grand_seconds,
         )
 
@@ -335,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
             average_duration_seconds=average_seconds(bucket.seconds, bucket.count),
             share_of_time_percent=share,
             average_group_size=average_group(bucket.groups),
+            plenary_count=bucket.plenary,
             session_total_seconds=grand_seconds,
         )
 
@@ -347,11 +391,13 @@ def main(argv: list[str] | None = None) -> int:
             session=session["title"],
             observer=session["observer"],
             room_speakers=session["room"],
+            estimated_participants=session["participants"],
             source_file=session["source"],
             count=session["count"],
             total_duration_seconds=session["total"],
             average_duration_seconds=average_seconds(int(session["total"]), int(session["count"])),
             average_group_size=average_group(session["groups"]),
+            plenary_count=session["plenary"],
             session_total_seconds=session["total"],
         )
         for name, share in zip(names, shares):
@@ -368,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
                 average_duration_seconds=average_seconds(bucket.seconds, bucket.count),
                 share_of_time_percent=share,
                 average_group_size=average_group(bucket.groups),
+                plenary_count=bucket.plenary,
                 session_total_seconds=session["total"],
             )
 
@@ -381,6 +428,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         share_of_time_percent="100.0" if grand_seconds else "",
         average_group_size=average_group(grand_groups),
+        plenary_count=grand_plenary,
         session_total_seconds=grand_seconds,
     )
 

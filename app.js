@@ -17,6 +17,7 @@
     "Participant question",
     "Survey",
     "Drawing",
+    "Closing remarks",
     "Other activity"
   ];
 
@@ -26,6 +27,7 @@
     { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
     { id: "survey", label: "Survey", types: ["Survey"] },
     { id: "drawing", label: "Drawing", types: ["Drawing"] },
+    { id: "closing", label: "Closing remarks", types: ["Closing remarks"] },
     { id: "other", label: "Other", types: ["Other activity"] }
   ];
 
@@ -39,12 +41,14 @@
   var CSV_HEADERS = [
     "session",
     "observer",
+    "estimated_participants",
     "room_speakers",
     "segment_type",
     "start",
     "end",
     "duration_seconds",
     "group_size",
+    "group_size_avg",
     "note"
   ];
 
@@ -67,6 +71,7 @@
   var lastFocused = null;
   var lastTap = { type: "", at: 0 };
   var pendingOtherAt = null;
+  var noteSegmentId = null;
   var editingId = null;
   var deletingId = null;
 
@@ -170,7 +175,18 @@
   }
 
   function wantsGroup(type) {
-    return type === "Conversation" || type === "Other activity";
+    return type === "Other activity";
+  }
+
+  function parseParticipants(value) {
+    if (value == null || value === "") return null;
+    var text = String(value).trim();
+    if (!text) return null;
+    var n = Number(text);
+    if (!isFinite(n) || n < 0) return null;
+    n = Math.round(n);
+    if (n > 99999) n = 99999;
+    return n;
   }
 
   function parseGroupSize(value) {
@@ -184,6 +200,62 @@
     return n;
   }
 
+  function normalizeGroupAvg(rawAvg, groupSize) {
+    var text = String(rawAvg || "").trim().toLowerCase();
+    if (text === "plenary" || text === "whole room" || text === "plenary/whole room") return "plenary";
+    var fromAvg = parseGroupSize(text);
+    if (fromAvg != null) return String(fromAvg);
+    if (groupSize != null) return String(groupSize);
+    return "";
+  }
+
+  function applyGroupAvg(seg, value) {
+    var text = String(value || "").trim().toLowerCase();
+    if (!text) {
+      seg.groupSizeAvg = "";
+      seg.groupSize = null;
+      return;
+    }
+    if (text === "plenary" || text === "whole room") {
+      seg.groupSizeAvg = "plenary";
+      seg.groupSize = null;
+      return;
+    }
+    var size = parseGroupSize(text);
+    if (size == null) {
+      seg.groupSizeAvg = "";
+      seg.groupSize = null;
+      return;
+    }
+    seg.groupSizeAvg = String(size);
+    seg.groupSize = size;
+  }
+
+  function groupPlain(seg) {
+    if (!seg) return "";
+    if (seg.groupSizeAvg === "plenary") return "Group size avg: Plenary";
+    if (seg.type === "Conversation" && (seg.groupSize != null || seg.groupSizeAvg)) {
+      return "Group size avg: " + (seg.groupSize != null ? seg.groupSize : seg.groupSizeAvg);
+    }
+    if (seg.groupSize != null) return "Group size: " + seg.groupSize;
+    return "";
+  }
+
+  function groupPhrase(seg) {
+    var plain = groupPlain(seg);
+    if (!plain) return "";
+    if (seg.groupSizeAvg === "plenary") return " · group size avg plenary";
+    if (seg.type === "Conversation") return " · group size avg " + (seg.groupSize != null ? seg.groupSize : seg.groupSizeAvg);
+    return " · group size " + seg.groupSize;
+  }
+
+  function csvGroupAvg(seg) {
+    if (seg.groupSizeAvg === "plenary") return "plenary";
+    if (seg.groupSizeAvg) return String(seg.groupSizeAvg);
+    if (seg.groupSize != null) return String(seg.groupSize);
+    return "";
+  }
+
   function blankSession(observer) {
     var now = new Date();
     return {
@@ -194,6 +266,7 @@
       speakers: "",
       plannedStart: toDatetimeLocal(now),
       observer: observer || "",
+      estimatedParticipants: null,
       status: "setup",
       segments: [],
       closing: null,
@@ -242,6 +315,7 @@
     if (session.segments.length) return false;
     if ((session.title || "").trim()) return false;
     if ((session.speakers || "").trim()) return false;
+    if (session.estimatedParticipants != null) return false;
     if (session.closing) return false;
     return true;
   }
@@ -347,12 +421,14 @@
     BUCKETS.forEach(function (bucket) { byId[bucket.id] = 0; });
     var total = 0;
     var groups = [];
+    var plenaryCount = 0;
     session.segments.forEach(function (seg) {
       var secs = segmentSeconds(seg);
       if (secs == null) return;
       byId[bucketIdFor(seg.type)] += secs;
       total += secs;
-      if (seg.groupSize != null) groups.push(seg.groupSize);
+      if (seg.groupSizeAvg === "plenary") plenaryCount += 1;
+      else if (seg.groupSize != null) groups.push(seg.groupSize);
     });
     var parts = BUCKETS.map(function (bucket) { return byId[bucket.id]; });
     var tenths = shareTenths(parts, total);
@@ -364,6 +440,7 @@
     return {
       totalSeconds: total,
       averageGroup: average,
+      plenaryCount: plenaryCount,
       buckets: BUCKETS.map(function (bucket, index) {
         return {
           id: bucket.id,
@@ -419,12 +496,14 @@
       lines.push([
         csvCell(session.title || ""),
         csvCell(session.observer || ""),
+        session.estimatedParticipants == null ? "" : String(session.estimatedParticipants),
         csvCell(room),
         csvCell(seg.type),
         csvCell(seg.start ? formatStamp(new Date(seg.start)) : ""),
         csvCell(seg.end ? formatStamp(new Date(seg.end)) : ""),
         secs == null ? "" : String(secs),
         seg.groupSize == null ? "" : String(seg.groupSize),
+        csvCell(csvGroupAvg(seg)),
         csvCell(exportNoteText(seg))
       ].join(","));
     });
@@ -433,7 +512,7 @@
 
   function segmentScriptLine(seg) {
     var start = formatHMS(new Date(seg.start));
-    var extra = seg.groupSize ? " · group size " + seg.groupSize : "";
+    var extra = groupPhrase(seg);
     var label = segmentLabel(seg);
     if (!seg.end) return start + " (running) " + label + extra;
     var secs = segmentSeconds(seg);
@@ -465,6 +544,7 @@
       "Session: " + (session.title || "—"),
       "Speakers: " + (speakersList(session).join(", ") || "—"),
       "Observer: " + (session.observer || "—"),
+      "Estimated participants: " + (session.estimatedParticipants == null ? "—" : String(session.estimatedParticipants)),
       "Date: " + formatDateLong(planned || first || new Date(session.createdAt || Date.now())),
       "Planned start: " + (planned ? formatHM(planned) : "—"),
       "Actual start: " + (first ? formatHMS(first) : "—"),
@@ -522,15 +602,28 @@
     var type = ACTIVITY_TYPES.indexOf(raw.type) === -1 ? "Other activity" : raw.type;
     var otherLabel = (raw.otherLabel || "").trim();
     if (type === "Other activity" && raw.type !== "Other activity" && !otherLabel) otherLabel = String(raw.type || "");
-    return {
+    var storedSize = parseGroupSize(raw.groupSize);
+    var avg = normalizeGroupAvg(raw.groupSizeAvg, storedSize);
+    var segment = {
       id: raw.id || uid(),
       type: type,
       otherLabel: otherLabel,
       start: raw.start,
       end: raw.end || null,
       note: raw.note || "",
-      groupSize: parseGroupSize(raw.groupSize)
+      groupSize: null,
+      groupSizeAvg: ""
     };
+    if (avg === "plenary") {
+      segment.groupSizeAvg = "plenary";
+    } else if (avg) {
+      segment.groupSizeAvg = avg;
+      segment.groupSize = parseGroupSize(avg);
+    } else if (storedSize != null) {
+      segment.groupSize = storedSize;
+      segment.groupSizeAvg = String(storedSize);
+    }
+    return segment;
   }
 
   function normalizeClosing(raw) {
@@ -555,6 +648,7 @@
     session.speakers = raw.speakers || "";
     session.plannedStart = raw.plannedStart || session.plannedStart;
     session.observer = raw.observer || "";
+    session.estimatedParticipants = parseParticipants(raw.estimatedParticipants);
     session.status = raw.status === "ended" || raw.status === "live" ? raw.status : "setup";
     session.segments = Array.isArray(raw.segments) ? raw.segments.map(normalizeSegment).filter(Boolean) : [];
     session.closing = normalizeClosing(raw.closing);
@@ -604,7 +698,8 @@
         start: activity.time,
         end: next ? next.time : null,
         note: activity.note || "",
-        groupSize: null
+        groupSize: null,
+        groupSizeAvg: ""
       });
     });
     session.updatedAt = new Date().toISOString();
@@ -722,6 +817,7 @@
     session.speakers = $("speakers").value;
     session.plannedStart = $("plannedStart").value;
     session.observer = $("observer").value;
+    session.estimatedParticipants = parseParticipants($("participants").value);
     session.updatedAt = new Date().toISOString();
     save();
     return session;
@@ -734,21 +830,25 @@
     var note = $("runNote");
     var group = $("runGroup");
     if (note) seg.note = note.value.trim();
-    if (group) seg.groupSize = parseGroupSize(group.value);
+    if (group) applyGroupAvg(seg, group.value);
   }
 
   function startSegment(session, type, when, extra) {
+    extra = extra || {};
     var iso = when.toISOString();
     var running = runningSegment(session);
     if (running) running.end = iso;
+    var groupSize = extra.groupSize != null ? extra.groupSize : null;
+    var groupSizeAvg = extra.groupSizeAvg || (groupSize != null ? String(groupSize) : "");
     session.segments.push({
       id: uid(),
       type: type,
-      otherLabel: (extra && extra.otherLabel) || "",
+      otherLabel: extra.otherLabel || "",
       start: iso,
       end: null,
-      note: (extra && extra.note) || "",
-      groupSize: extra && extra.groupSize != null ? extra.groupSize : null
+      note: extra.note || "",
+      groupSize: groupSizeAvg === "plenary" ? null : groupSize,
+      groupSizeAvg: groupSizeAvg
     });
     session.status = "live";
     session.updatedAt = iso;
@@ -772,6 +872,8 @@
     }
     captureRunningFields();
     startSegment(session, type, when, {});
+    var started = runningSegment(currentSession());
+    if (started) openNoteSheet(started);
     buzz();
   }
 
@@ -799,11 +901,85 @@
     var when = pendingOtherAt;
     pendingOtherAt = null;
     closeModal("otherModal");
+    var size = parseGroupSize($("otherGroup").value);
     startSegment(session, "Other activity", when, {
       otherLabel: label,
-      groupSize: parseGroupSize($("otherGroup").value),
+      groupSize: size,
+      groupSizeAvg: size != null ? String(size) : "",
       note: $("otherNote").value.trim()
     });
+  }
+
+  function bindChipRow(containerId, customId) {
+    $(containerId).addEventListener("click", function (ev) {
+      var chip = ev.target.closest("[data-chip]");
+      if (!chip || !$(containerId).contains(chip)) return;
+      var next = chip.getAttribute("aria-pressed") === "true" ? "" : chip.getAttribute("data-chip");
+      setChips(containerId, next);
+      if (next && $(customId)) $(customId).value = "";
+    });
+    if ($(customId)) {
+      $(customId).addEventListener("input", function () {
+        if ($(customId).value.trim()) setChips(containerId, "");
+      });
+    }
+  }
+
+  function setChips(containerId, value) {
+    var chips = $(containerId).querySelectorAll("[data-chip]");
+    for (var i = 0; i < chips.length; i++) {
+      if (value && chips[i].getAttribute("data-chip") === value) chips[i].setAttribute("aria-pressed", "true");
+      else chips[i].removeAttribute("aria-pressed");
+    }
+  }
+
+  function readGroupAvg(containerId, customId) {
+    var custom = customId && $(customId) ? $(customId).value.trim() : "";
+    if (custom) return custom;
+    var pressed = $(containerId).querySelector("[aria-pressed='true']");
+    return pressed ? pressed.getAttribute("data-chip") : "";
+  }
+
+  function showGroupAvg(containerId, customId, value) {
+    var presets = { "2": true, "3": true, "4": true, "5": true, "6": true, "8": true, "plenary": true };
+    if (value && presets[value]) {
+      setChips(containerId, value);
+      if (customId && $(customId)) $(customId).value = "";
+      return;
+    }
+    setChips(containerId, "");
+    if (customId && $(customId)) $(customId).value = value || "";
+  }
+
+  function openNoteSheet(seg) {
+    noteSegmentId = seg.id;
+    $("noteTitle").textContent = seg.type;
+    $("noteStart").textContent = formatHMS(new Date(seg.start));
+    $("noteText").value = seg.note || "";
+    var conversation = seg.type === "Conversation";
+    $("noteGroupWrap").classList.toggle("hidden", !conversation);
+    if (conversation) showGroupAvg("noteChips", "noteGroupCustom", seg.groupSizeAvg || "");
+    openModal("noteModal");
+  }
+
+  function saveNoteSheet() {
+    var session = currentSession();
+    var seg = findSegment(session, noteSegmentId);
+    if (seg) {
+      seg.note = $("noteText").value.trim();
+      if (seg.type === "Conversation") applyGroupAvg(seg, readGroupAvg("noteChips", "noteGroupCustom"));
+      session.updatedAt = new Date().toISOString();
+      if (session.status === "ended") session.dirtyExport = true;
+      save();
+    }
+    noteSegmentId = null;
+    closeModal("noteModal");
+    render();
+  }
+
+  function skipNoteSheet() {
+    noteSegmentId = null;
+    closeModal("noteModal");
   }
 
   function cancelOther() {
@@ -1116,6 +1292,7 @@
       current.plannedStart = toDatetimeLocal(new Date());
       current.title = "";
       current.speakers = "";
+      current.estimatedParticipants = null;
       current.updatedAt = new Date().toISOString();
       state.screen = null;
       exportNote = { text: "", error: false };
@@ -1175,7 +1352,7 @@
   }
 
   function showPast() {
-    if (document.body.dataset.view === "setup" && ($("sessionTitle").value || $("observer").value || $("speakers").value)) {
+    if (document.body.dataset.view === "setup" && ($("sessionTitle").value || $("observer").value || $("speakers").value || $("participants").value)) {
       persistSetupFromForm();
     }
     if (document.body.dataset.view === "live") {
@@ -1195,22 +1372,30 @@
     showPast();
   }
 
+  function logSuffix(seg) {
+    var bits = [];
+    if (seg.groupSizeAvg === "plenary") bits.push("plenary");
+    else if (seg.type === "Conversation" && seg.groupSize != null) bits.push("avg " + seg.groupSize);
+    else if (seg.groupSize != null) bits.push("group " + seg.groupSize);
+    var note = (seg.note || "").trim().replace(/\s+/g, " ");
+    if (note.length > 24) note = note.slice(0, 23).trim() + "…";
+    if (note) bits.push(note);
+    return bits.length ? " · " + bits.join(" · ") : "";
+  }
+
   function segmentItemHtml(seg) {
     var ended = !!seg.end;
-    var start = formatHMS(new Date(seg.start));
-    var timeLine = ended ? start + " – " + formatHMS(new Date(seg.end)) : start;
     var badge = ended
       ? '<span class="dur">' + escapeHtml(formatSeconds(segmentSeconds(seg))) + "</span>"
-      : '<span class="dur dur-live">Running</span>';
-    var group = seg.groupSize ? " · group of " + seg.groupSize : "";
-    var note = (seg.note || "").trim();
+      : '<span class="dur dur-live" data-live-start="' + escapeHtml(seg.start) + '">' + escapeHtml(formatElapsed(seg.start)) + "</span>";
+    var suffix = logSuffix(seg);
     return '<li class="log-item" data-id="' + escapeHtml(seg.id) + '" data-type="' + escapeHtml(seg.type) + '" data-running="' + (ended ? "false" : "true") + '" data-seconds="' + (ended ? String(segmentSeconds(seg)) : "") + '">' +
-      '<div class="log-type">' + escapeHtml(segmentLabel(seg) + group) + "</div>" +
-      badge +
-      '<div class="log-time">' + escapeHtml(timeLine) + "</div>" +
-      '<button type="button" class="linkish" data-edit="' + escapeHtml(seg.id) + '">Edit</button>' +
-      (note ? '<p class="log-note">' + escapeHtml(note) + "</p>" : "") +
-      "</li>";
+      '<button type="button" class="log-line" data-edit="' + escapeHtml(seg.id) + '">' +
+        '<span class="log-name">' + escapeHtml(segmentLabel(seg)) +
+          (suffix ? '<span class="log-suffix">' + escapeHtml(suffix) + "</span>" : "") +
+        "</span>" +
+        badge +
+      "</button></li>";
   }
 
   function renderLog(list, emptyEl, session) {
@@ -1269,7 +1454,7 @@
   function renderRunning(session) {
     var card = $("runningCard");
     var seg = runningSegment(session);
-    var key = seg ? [seg.id, seg.type, seg.otherLabel || ""].join("|") : "none";
+    var key = seg ? [seg.id, seg.type, seg.otherLabel || "", seg.groupSizeAvg || ""].join("|") : "none";
     markPressed(seg ? seg.type : "");
     if (card.getAttribute("data-key") === key && card.contains(document.activeElement)) {
       var ticking = $("runTimer");
@@ -1287,14 +1472,11 @@
       bindRunning(null);
       return;
     }
-    var groupField = wantsGroup(seg.type)
-      ? '<div class="field"><label for="runGroup">Group size <span class="opt">(optional)</span></label>' +
-        '<input type="number" id="runGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 4"></div>'
-      : "";
+    var groupLine = groupPlain(seg);
+    var groupField = groupLine ? '<p class="run-group">' + escapeHtml(groupLine) + "</p>" : "";
     card.innerHTML =
       '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span> Running</p>' +
       '<h3 class="run-name">' + escapeHtml(segmentLabel(seg)) + "</h3>" +
-      '<p class="run-start">Started ' + escapeHtml(formatHMS(new Date(seg.start))) + "</p>" +
       '<p class="run-timer" id="runTimer">' + escapeHtml(formatElapsed(seg.start)) + "</p>" +
       groupField +
       '<div class="field"><div class="note-row"><label for="runNote">Note <span class="opt">(optional)</span></label>' +
@@ -1345,11 +1527,13 @@
     }).join("");
     var avg = formatAvg(totals.averageGroup);
     var comment = session.closing && session.closing.comment ? "<br>" + escapeHtml(session.closing.comment) : "";
-    return '<div class="total-head"><h2>Totals</h2><div class="session-len" data-total-seconds="' + totals.totalSeconds + '">' +
+    return '<p class="avg-line">Estimated participants: ' + escapeHtml(session.estimatedParticipants == null ? "—" : String(session.estimatedParticipants)) + "</p>" +
+      '<div class="total-head"><h2>Totals</h2><div class="session-len" data-total-seconds="' + totals.totalSeconds + '">' +
       escapeHtml(totals.totalSeconds ? formatSeconds(totals.totalSeconds) : "0 min") + "</div></div>" +
       rows +
       '<p class="avg-line" data-group-avg="' + escapeHtml(avg == null ? "" : avg) + '">Average group size: ' +
       escapeHtml(avg == null ? "—" : avg) + "</p>" +
+      (totals.plenaryCount ? '<p class="avg-line">Plenary (whole room): ' + totals.plenaryCount + "</p>" : "") +
       '<p class="closing-line"><strong>After the closing announcement</strong>' +
       escapeHtml(closingAnswerText(session)) + comment + "</p>";
   }
@@ -1364,7 +1548,7 @@
       '<div class="session-top"><h3>' + escapeHtml(session.title || "Untitled session") + '</h3>' +
       '<span class="badge ' + badgeClass + '">' + badgeText + "</span></div>" +
       '<p class="session-meta">' + escapeHtml(formatDateShort(sessionDate(session)) + " · " + (session.observer || "No observer name")) + "</p>" +
-      '<p class="session-meta">' + escapeHtml(formatSeconds(sessionSeconds(session)) + (speakers ? " · " + speakers : "")) + "</p>" +
+      '<p class="session-meta">' + escapeHtml(formatSeconds(sessionSeconds(session)) + (speakers ? " · " + speakers : "") + (session.estimatedParticipants == null ? "" : " · " + session.estimatedParticipants + " participants")) + "</p>" +
       '<div class="session-actions' + (showEmail ? "" : " two") + '">' +
       '<button type="button" class="btn" data-open>Open</button>' + email +
       '<button type="button" class="btn btn-danger" data-delete>Delete</button></div></article>';
@@ -1375,12 +1559,14 @@
       title: "",
       speakers: "",
       plannedStart: toDatetimeLocal(new Date()),
-      observer: lastObserver()
+      observer: lastObserver(),
+      estimatedParticipants: null
     };
     setIdle("sessionTitle", model.title);
     setIdle("speakers", model.speakers);
     setIdle("plannedStart", model.plannedStart || toDatetimeLocal(new Date()));
     setIdle("observer", model.observer);
+    setIdle("participants", model.estimatedParticipants == null ? "" : String(model.estimatedParticipants));
   }
 
   function renderLive(session) {
@@ -1389,6 +1575,7 @@
     setIdle("liveSpeakers", session.speakers);
     setIdle("livePlanned", session.plannedStart);
     setIdle("liveObserver", session.observer);
+    setIdle("liveParticipants", session.estimatedParticipants == null ? "" : String(session.estimatedParticipants));
     renderRunning(session);
     renderLog($("logList"), $("logEmpty"), session);
   }
@@ -1437,6 +1624,7 @@
     $("editType").value = seg.type;
     $("editOther").value = seg.otherLabel || "";
     $("editGroup").value = seg.groupSize == null ? "" : String(seg.groupSize);
+    showGroupAvg("editChips", "editGroupCustom", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
     $("editNote").value = seg.note || "";
     $("editStart").textContent = formatHMS(new Date(seg.start));
     $("editDuration").textContent = seg.end ? formatSeconds(segmentSeconds(seg)) : "Still running";
@@ -1447,7 +1635,8 @@
   function toggleEditFields() {
     var type = $("editType").value;
     $("editOtherWrap").classList.toggle("hidden", type !== "Other activity");
-    $("editGroupWrap").classList.toggle("hidden", !wantsGroup(type));
+    $("editGroupWrap").classList.toggle("hidden", type !== "Other activity");
+    $("editAvgWrap").classList.toggle("hidden", type !== "Conversation");
   }
 
   function saveEdit() {
@@ -1467,7 +1656,9 @@
     }
     seg.type = type;
     seg.otherLabel = otherLabel;
-    seg.groupSize = wantsGroup(type) ? parseGroupSize($("editGroup").value) : null;
+    if (type === "Conversation") applyGroupAvg(seg, readGroupAvg("editChips", "editGroupCustom"));
+    else if (type === "Other activity") applyGroupAvg(seg, $("editGroup").value);
+    else applyGroupAvg(seg, "");
     seg.note = $("editNote").value.trim();
     if (session.status === "ended") session.dirtyExport = true;
     session.updatedAt = new Date().toISOString();
@@ -1476,6 +1667,66 @@
     closeModal("editModal");
     render();
     toast("Segment updated");
+  }
+
+  function askDeleteLine() {
+    var session = currentSession();
+    var seg = findSegment(session, editingId);
+    if (!session || !seg) return;
+    var ordered = orderedSegments(session);
+    var index = -1;
+    for (var i = 0; i < ordered.length; i++) {
+      if (ordered[i].id === seg.id) index = i;
+    }
+    var prev = index > 0 ? ordered[index - 1] : null;
+    var next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+    var body;
+    if (!seg.end && prev) {
+      body = segmentLabel(seg) + " will be removed. " + segmentLabel(prev) + " will be running again.";
+    } else if (prev && next) {
+      body = segmentLabel(seg) + " will be removed. " + segmentLabel(prev) + " will run until " + segmentLabel(next) + " starts.";
+    } else if (prev && seg.end) {
+      body = segmentLabel(seg) + " will be removed. " + segmentLabel(prev) + " will cover the time through the end of this line.";
+    } else {
+      body = segmentLabel(seg) + " will be removed from this session.";
+    }
+    $("lineDeleteBody").textContent = body;
+    openModal("lineDeleteModal");
+  }
+
+  function confirmDeleteLine() {
+    var session = currentSession();
+    var seg = findSegment(session, editingId);
+    if (!session || !seg) {
+      closeModal("lineDeleteModal");
+      closeModal("editModal");
+      editingId = null;
+      return;
+    }
+    var ordered = orderedSegments(session);
+    var index = -1;
+    for (var i = 0; i < ordered.length; i++) {
+      if (ordered[i].id === seg.id) index = i;
+    }
+    var prev = index > 0 ? ordered[index - 1] : null;
+    var next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+    if (!seg.end) {
+      if (prev) prev.end = null;
+    } else if (prev && next) {
+      prev.end = next.start;
+    } else if (prev && seg.end) {
+      prev.end = seg.end;
+    }
+    session.segments = session.segments.filter(function (item) { return item.id !== seg.id; });
+    if (session.status === "ended") session.dirtyExport = true;
+    session.updatedAt = new Date().toISOString();
+    editingId = null;
+    lastTap = { type: "", at: 0 };
+    save();
+    closeModal("lineDeleteModal");
+    closeModal("editModal");
+    render();
+    toast("Line deleted");
   }
 
   function onLogClick(ev) {
@@ -1491,6 +1742,7 @@
     session.speakers = $("liveSpeakers").value;
     session.plannedStart = $("livePlanned").value;
     session.observer = $("liveObserver").value;
+    session.estimatedParticipants = parseParticipants($("liveParticipants").value);
     session.updatedAt = new Date().toISOString();
     if (session.status === "ended") session.dirtyExport = true;
     save();
@@ -1504,6 +1756,7 @@
     session.speakers = $("speakers").value;
     session.plannedStart = $("plannedStart").value || toDatetimeLocal(new Date());
     session.observer = $("observer").value.trim();
+    session.estimatedParticipants = parseParticipants($("participants").value);
     if (!session.title) {
       $("setupError").textContent = "Add a session title.";
       $("sessionTitle").focus();
@@ -1532,7 +1785,7 @@
 
   function bind() {
     $("setupForm").addEventListener("submit", startTiming);
-    ["sessionTitle", "speakers", "plannedStart", "observer"].forEach(function (id) {
+    ["sessionTitle", "speakers", "plannedStart", "observer", "participants"].forEach(function (id) {
       $(id).addEventListener("input", function () {
         $("setupError").textContent = "";
         persistSetupFromForm();
@@ -1542,7 +1795,7 @@
     $("setupPastBtn").addEventListener("click", showPast);
     $("pastBtn").addEventListener("click", togglePast);
 
-    ["liveTitle", "liveSpeakers", "livePlanned", "liveObserver"].forEach(function (id) {
+    ["liveTitle", "liveSpeakers", "livePlanned", "liveObserver", "liveParticipants"].forEach(function (id) {
       $(id).addEventListener("input", onLiveDetails);
       $(id).addEventListener("change", onLiveDetails);
     });
@@ -1561,8 +1814,15 @@
     });
     $("otherSave").addEventListener("click", confirmOther);
     $("otherCancel").addEventListener("click", cancelOther);
+    $("noteSkip").addEventListener("click", skipNoteSheet);
+    $("noteSave").addEventListener("click", saveNoteSheet);
+    bindChipRow("noteChips", "noteGroupCustom");
+    bindChipRow("editChips", "editGroupCustom");
     $("otherModal").addEventListener("click", function (ev) {
       if (ev.target === $("otherModal")) cancelOther();
+    });
+    $("noteModal").addEventListener("click", function (ev) {
+      if (ev.target === $("noteModal")) skipNoteSheet();
     });
 
     var radios = document.querySelectorAll('input[name="closing"]');
@@ -1580,6 +1840,12 @@
       closeModal("editModal");
     });
     $("editSave").addEventListener("click", saveEdit);
+    $("editDelete").addEventListener("click", askDeleteLine);
+    $("lineDeleteKeep").addEventListener("click", function () { closeModal("lineDeleteModal"); });
+    $("lineDeleteConfirm").addEventListener("click", confirmDeleteLine);
+    $("lineDeleteModal").addEventListener("click", function (ev) {
+      if (ev.target === $("lineDeleteModal")) closeModal("lineDeleteModal");
+    });
     $("editModal").addEventListener("click", function (ev) {
       if (ev.target === $("editModal")) {
         editingId = null;
@@ -1634,7 +1900,9 @@
 
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
-      if (!$("otherModal").classList.contains("hidden")) cancelOther();
+      if (!$("lineDeleteModal").classList.contains("hidden")) closeModal("lineDeleteModal");
+      else if (!$("noteModal").classList.contains("hidden")) skipNoteSheet();
+      else if (!$("otherModal").classList.contains("hidden")) cancelOther();
       else if (!$("endModal").classList.contains("hidden")) closeModal("endModal");
       else if (!$("editModal").classList.contains("hidden")) {
         editingId = null;
@@ -1677,8 +1945,12 @@
   function tick() {
     if (document.body.dataset.view !== "live") return;
     var seg = runningSegment(currentSession());
+    if (!seg) return;
+    var label = formatElapsed(seg.start);
     var timer = $("runTimer");
-    if (timer && seg) timer.textContent = formatElapsed(seg.start);
+    if (timer) timer.textContent = label;
+    var badges = document.querySelectorAll("[data-live-start]");
+    for (var i = 0; i < badges.length; i++) badges[i].textContent = label;
   }
 
   fillEditTypes();
