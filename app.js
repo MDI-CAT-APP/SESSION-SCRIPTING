@@ -13,6 +13,7 @@
     "Introduction",
     "Presentation",
     "Conversation",
+    "Feedback",
     "Q&A",
     "Participant question",
     "Survey",
@@ -23,6 +24,7 @@
   var BUCKETS = [
     { id: "presentation", label: "Presentation (incl. introduction)", types: ["Introduction", "Presentation"] },
     { id: "conversation", label: "Conversation", types: ["Conversation"] },
+    { id: "feedback", label: "Feedback", types: ["Feedback"] },
     { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
     { id: "survey", label: "Survey", types: ["Survey"] },
     { id: "closing", label: "Closing remarks", types: ["Closing remarks"] },
@@ -58,6 +60,7 @@
     "Question from a participant": "Participant question",
     "Participant question": "Participant question",
     "Conversation": "Conversation",
+    "Feedback": "Feedback",
     "Q&A": "Q&A",
     "Survey": "Survey",
     "Other activity": "Other activity"
@@ -946,19 +949,13 @@
     });
   }
 
-  function bindChipRow(containerId, customId) {
+  function bindChipRow(containerId) {
     $(containerId).addEventListener("click", function (ev) {
       var chip = ev.target.closest("[data-chip]");
       if (!chip || !$(containerId).contains(chip)) return;
       var next = chip.getAttribute("aria-pressed") === "true" ? "" : chip.getAttribute("data-chip");
       setChips(containerId, next);
-      if (next && $(customId)) $(customId).value = "";
     });
-    if ($(customId)) {
-      $(customId).addEventListener("input", function () {
-        if ($(customId).value.trim()) setChips(containerId, "");
-      });
-    }
   }
 
   function setChips(containerId, value) {
@@ -969,22 +966,22 @@
     }
   }
 
-  function readGroupAvg(containerId, customId) {
-    var custom = customId && $(customId) ? $(customId).value.trim() : "";
-    if (custom) return custom;
+  function readGroupAvg(containerId) {
     var pressed = $(containerId).querySelector("[aria-pressed='true']");
     return pressed ? pressed.getAttribute("data-chip") : "";
   }
 
-  function showGroupAvg(containerId, customId, value) {
-    var presets = { "2": true, "3": true, "4": true, "5": true, "6": true, "8": true, "plenary": true };
-    if (value && presets[value]) {
-      setChips(containerId, value);
-      if (customId && $(customId)) $(customId).value = "";
-      return;
-    }
-    setChips(containerId, "");
-    if (customId && $(customId)) $(customId).value = value || "";
+  function showGroupAvg(containerId, value) {
+    var presets = { "2": true, "3": true, "4": true, "5": true, "6": true };
+    setChips(containerId, value && presets[value] ? value : "");
+  }
+
+  function commitGroupAvg(seg, containerId) {
+    var picked = readGroupAvg(containerId);
+    var previous = seg.groupSizeAvg || "";
+    var chips = { "2": true, "3": true, "4": true, "5": true, "6": true };
+    if (picked) applyGroupAvg(seg, picked);
+    else if (chips[previous]) applyGroupAvg(seg, "");
   }
 
   function openNoteSheet(seg) {
@@ -994,7 +991,7 @@
     $("noteText").value = seg.note || "";
     var conversation = seg.type === "Conversation";
     $("noteGroupWrap").classList.toggle("hidden", !conversation);
-    if (conversation) showGroupAvg("noteChips", "noteGroupCustom", seg.groupSizeAvg || "");
+    if (conversation) showGroupAvg("noteChips", seg.groupSizeAvg || "");
     openModal("noteModal");
   }
 
@@ -1003,7 +1000,7 @@
     var seg = findSegment(session, noteSegmentId);
     if (seg) {
       seg.note = $("noteText").value.trim();
-      if (seg.type === "Conversation") applyGroupAvg(seg, readGroupAvg("noteChips", "noteGroupCustom"));
+      if (seg.type === "Conversation") commitGroupAvg(seg, "noteChips");
       session.updatedAt = new Date().toISOString();
       if (session.status === "ended") session.dirtyExport = true;
       save();
@@ -1674,7 +1671,7 @@
     $("editOther").value = seg.otherLabel || "";
     markOtherQuick("editQuick", seg.otherLabel || "");
     $("editGroup").value = seg.groupSize == null ? "" : String(seg.groupSize);
-    showGroupAvg("editChips", "editGroupCustom", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
+    showGroupAvg("editChips", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
     $("editNote").value = seg.note || "";
     $("editStart").textContent = formatHMS(new Date(seg.start));
     $("editDuration").textContent = seg.end ? formatSeconds(segmentSeconds(seg)) : "Still running";
@@ -1706,7 +1703,7 @@
     }
     seg.type = type;
     seg.otherLabel = otherLabel;
-    if (type === "Conversation") applyGroupAvg(seg, readGroupAvg("editChips", "editGroupCustom"));
+    if (type === "Conversation") commitGroupAvg(seg, "editChips");
     else if (type === "Other activity") applyGroupAvg(seg, $("editGroup").value);
     else applyGroupAvg(seg, "");
     seg.note = $("editNote").value.trim();
@@ -1875,8 +1872,8 @@
     $("otherCancel").addEventListener("click", cancelOther);
     $("noteSkip").addEventListener("click", skipNoteSheet);
     $("noteSave").addEventListener("click", saveNoteSheet);
-    bindChipRow("noteChips", "noteGroupCustom");
-    bindChipRow("editChips", "editGroupCustom");
+    bindChipRow("noteChips");
+    bindChipRow("editChips");
     $("otherModal").addEventListener("click", function (ev) {
       if (ev.target === $("otherModal")) cancelOther();
     });

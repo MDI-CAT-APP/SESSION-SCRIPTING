@@ -115,6 +115,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5 4 19V7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5V12"></path><path d="M9 10h9.5A1.5 1.5 0 0 1 20 11.5V18l-2.2-1.5H10.5A1.5 1.5 0 0 1 9 15Z"></path></svg>
             Conversation
           </button>
+          <button type="button" data-type="Feedback">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5 4.5 19V8A1.5 1.5 0 0 1 6 6.5h12A1.5 1.5 0 0 1 19.5 8v7a1.5 1.5 0 0 1-1.5 1.5H6Z"></path><path d="M8 10.5h8M8 13.5h5"></path></svg>
+            Feedback
+          </button>
           <button type="button" data-type="Q&amp;A">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.7.3-1.2.9-1.2 1.6V14"></path><path d="M12 17h.01"></path></svg>
             Q&amp;A
@@ -247,19 +251,14 @@
       </div>
       <p class="hint" id="noteHint">This line has started. Add a note now, or skip and add one later.</p>
       <div id="noteGroupWrap" class="field hidden">
-        <label>Group size avg <span class="opt">(optional)</span></label>
+        <label>Conversation group size avg <span class="opt">(optional)</span></label>
         <div class="chip-row" id="noteChips">
           <button type="button" class="chip" data-chip="2">2</button>
           <button type="button" class="chip" data-chip="3">3</button>
           <button type="button" class="chip" data-chip="4">4</button>
           <button type="button" class="chip" data-chip="5">5</button>
           <button type="button" class="chip" data-chip="6">6</button>
-          <button type="button" class="chip" data-chip="8">8</button>
-          <button type="button" class="chip" data-chip="plenary">Plenary</button>
         </div>
-        <p class="hint">Plenary means the whole room. Or type another number.</p>
-        <label for="noteGroupCustom">Custom number</label>
-        <input type="number" id="noteGroupCustom" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 7">
       </div>
       <div class="field">
         <label for="noteText">Note <span class="opt">(optional)</span></label>
@@ -326,19 +325,14 @@
         <input type="number" id="editGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
       </div>
       <div class="field hidden" id="editAvgWrap">
-        <label>Group size avg <span class="opt">(optional)</span></label>
+        <label>Conversation group size avg <span class="opt">(optional)</span></label>
         <div class="chip-row" id="editChips">
           <button type="button" class="chip" data-chip="2">2</button>
           <button type="button" class="chip" data-chip="3">3</button>
           <button type="button" class="chip" data-chip="4">4</button>
           <button type="button" class="chip" data-chip="5">5</button>
           <button type="button" class="chip" data-chip="6">6</button>
-          <button type="button" class="chip" data-chip="8">8</button>
-          <button type="button" class="chip" data-chip="plenary">Plenary</button>
         </div>
-        <p class="hint">Plenary means the whole room. Or type another number.</p>
-        <label for="editGroupCustom">Custom number</label>
-        <input type="number" id="editGroupCustom" inputmode="numeric" min="1" max="999" step="1" placeholder="e.g. 7">
       </div>
       <div class="field">
         <label for="editNote">Note <span class="opt">(optional)</span></label>

@@ -55,6 +55,7 @@ SEGMENT_TYPES = [
     "Introduction",
     "Presentation",
     "Conversation",
+    "Feedback",
     "Q&A",
     "Participant question",
     "Survey",
@@ -66,6 +67,7 @@ SEGMENT_TYPES = [
 BUCKETS = [
     ("Presentation (incl. introduction)", ["Introduction", "Presentation"]),
     ("Conversation", ["Conversation"]),
+    ("Feedback", ["Feedback"]),
     ("Q&A (incl. participant questions)", ["Q&A", "Participant question"]),
     ("Survey", ["Survey"]),
     ("Closing remarks", ["Closing remarks"]),

@@ -12,7 +12,7 @@ Open `index.html` on the phone, or run the optional server below and open that a
 2. Tap **Next**. That opens the activity screen and does not start the clock.
 3. Tap an activity to start timing. That first tap is the actual start, and the first segment begins then. Each later tap ends the segment that was running and starts the next one.
 
-Activities: Introduction, Presentation, Conversation, Q&A, Participant question, Survey, Closing remarks, and Other activity. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
+Activities: Introduction, Presentation, Conversation, Feedback, Q&A, Participant question, Survey, Closing remarks, and Other activity. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
 
 The on-screen log is a dense list: one 13px line per activity, name and length only. A running line shows the live length. A note or group size is shortened on that same line. The full text, group size, and start time are in Edit. Start and end times stay in the TXT and CSV files.
 
@@ -22,7 +22,7 @@ Every new line opens an optional note. You can skip it, type it immediately, cha
 
 **Edit** on a line can change the activity, the note, and the group size. **Delete line** asks you to confirm, then removes that line and keeps the timeline continuous: the previous line extends to the next line’s start. If you delete the line that is still running, the previous line is running again.
 
-Conversation has **Group size avg**: 2, 3, 4, 5, 6, 8, Plenary (the whole room), or a custom number. Other activity still has an optional group size.
+Conversation has **Conversation group size avg**: 2, 3, 4, 5, or 6. Older logs can still carry another number or plenary, and those values stay in the exports. Other activity still has an optional group size.
 
 The log is saved on the phone as you go. Reloading the page does not clear it.
 
@@ -53,6 +53,7 @@ The report lists every segment and these totals, with the share of the session:
 
 - Presentation (including introduction)
 - Conversation
+- Feedback
 - Q&A (including participant questions)
 - Survey
 - Closing remarks
@@ -87,7 +88,7 @@ Every observer's CSV uses the same header, so files from several rooms can be st
 | estimated_participants | Optional whole number from setup. The same value is repeated on every row of that session |
 | room_name | Room name from setup. Repeated on every row of that session |
 | room_speakers | Speaker names, separated by `; ` |
-| segment_type | Introduction, Presentation, Conversation, Q&A, Participant question, Survey, Closing remarks, or Other activity. A former Drawing line is Other activity, with Drawing in the note |
+| segment_type | Introduction, Presentation, Conversation, Feedback, Q&A, Participant question, Survey, Closing remarks, or Other activity. A former Drawing line is Other activity, with Drawing in the note |
 | start | Local start, `YYYY-MM-DD HH:MM:SS` |
 | end | Local end, same format |
 | duration_seconds | Whole seconds |
@@ -115,8 +116,8 @@ Python 3 only. No packages to install.
 
 The summary is one sheet with a `section` column:
 
-- **segment_type** — each activity across all files, including Closing remarks: count, total seconds, average seconds, share of all recorded time, average group size, and how many lines were plenary
-- **bucket** — the same roll-up the phone report uses (presentation includes introduction, Q&A includes participant questions)
+- **segment_type** — each activity across all files, including Feedback and Closing remarks: count, total seconds, average seconds, share of all recorded time, average group size, and how many lines were plenary
+- **bucket** — the same roll-up the phone report uses (presentation includes introduction, Feedback is its own total, Q&A includes participant questions)
 - **session** — one row per exported session: total time, average group size, room name, and the estimated number of participants
 - **session_segment** — each activity inside one session, with that session's share of time
 - **total** — everything added together
