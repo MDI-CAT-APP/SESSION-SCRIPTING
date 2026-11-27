@@ -597,6 +597,8 @@ body[data-view="live"] .live-footer { display: block; }
 }
 
 .live-footer .btn-end:active { transform: translateY(1px); }
+.live-footer .btn-end:disabled { opacity: 0.4; transform: none; }
+.live-footer .btn-end:disabled { opacity: 0.4; transform: none; }
 
 .export-grid {
   display: grid;

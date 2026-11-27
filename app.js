@@ -1019,7 +1019,7 @@
 
   function openEnd() {
     var session = currentSession();
-    if (!session || session.status !== "live") return;
+    if (!session || session.status !== "live" || !session.segments.length) return;
     captureRunningFields();
     save();
     var radios = document.querySelectorAll('input[name="closing"]');
@@ -1092,7 +1092,7 @@
   function finalizeSession() {
     if (!closingValid()) return;
     var session = currentSession();
-    if (!session || session.status !== "live") return;
+    if (!session || session.status !== "live" || !session.segments.length) return;
     captureRunningFields();
     var when = new Date();
     var running = runningSegment(session);
@@ -1466,8 +1466,7 @@
     card.setAttribute("data-key", key);
     if (!seg) {
       card.innerHTML =
-        '<p class="run-empty-title">Tap an activity</p>' +
-        '<p class="run-empty-copy">The start time is taken when you tap. Duration appears when the next activity starts, or when you end the session.</p>' +
+        '<p class="run-empty-title">Tap an activity to start timing</p>' +
         '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>';
       bindRunning(null);
       return;
@@ -1578,6 +1577,10 @@
     setIdle("liveParticipants", session.estimatedParticipants == null ? "" : String(session.estimatedParticipants));
     renderRunning(session);
     renderLog($("logList"), $("logEmpty"), session);
+    var endBtn = $("endSessionBtn");
+    var started = session.segments.length > 0;
+    endBtn.disabled = !started;
+    endBtn.setAttribute("aria-disabled", started ? "false" : "true");
   }
 
   function renderReport(session) {
@@ -1770,6 +1773,7 @@
     $("setupError").textContent = "";
     $("sessionTitle").value = session.title;
     $("observer").value = session.observer;
+    // Next only opens the activity screen. Timing starts on the first activity tap.
     session.status = "live";
     session.updatedAt = new Date().toISOString();
     state.screen = null;

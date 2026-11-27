@@ -9,8 +9,8 @@ Up to four observers can each keep their own log. Nothing is uploaded by itself.
 Open `index.html` on the phone, or run the optional server below and open that address.
 
 1. Enter the **session title**, **speaker name(s)** (one per line), the **planned start** (date and time), **your name**, and, if you know it, the **estimated nr of participants**.
-2. Tap **Start timing**.
-3. Tap an activity when the session moves on. That tap ends the segment that was running and starts the next one. The start time is the moment you tap the activity.
+2. Tap **Next**. That opens the activity screen and does not start the clock.
+3. Tap an activity to start timing. That first tap is the actual start, and the first segment begins then. Each later tap ends the segment that was running and starts the next one.
 
 Activities: Introduction, Presentation, Conversation, Q&A, Participant question, Survey, Drawing, Closing remarks, and Other activity. Other activity asks what is happening. The time shown is still the moment you tapped the button, not the moment you finished typing.
 
