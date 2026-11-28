@@ -712,7 +712,7 @@ body[data-view="live"] .live-footer { display: block; }
 }
 
 .save-card h3 {
-  margin: 1px 0 2px;
+  margin: 1px 0 6px;
   font-size: 1.02rem;
   line-height: 1.15;
 }

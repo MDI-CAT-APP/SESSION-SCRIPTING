@@ -1564,7 +1564,7 @@
     } else if (ios) {
       body = "iPhone cannot save files silently. The share sheet opens so you can choose Save to Files. Then email both files to " + mail + ".";
     } else {
-      body = "Both files were saved on this phone. Email them to " + mail + ".";
+      body = "";
     }
     var names = files
       ? '<div class="file-row"><p class="file-name">' + escapeHtml(files.txtName) + '</p><p class="file-name">' + escapeHtml(files.csvName) + "</p></div>"
@@ -1572,8 +1572,9 @@
     var dirty = session.dirtyExport
       ? '<p id="dirtyNote">Details changed after these files were saved. Save them again before you email.</p>'
       : "";
-    return '<p class="save-kicker">Session ended</p><h3>' + escapeHtml(title) + '</h3><p class="save-body">' +
-      body + "</p>" + names + dirty;
+    var bodyHtml = body ? '<p class="save-body">' + body + "</p>" : "";
+    return '<p class="save-kicker">Session ended</p><h3>' + escapeHtml(title) + "</h3>" +
+      bodyHtml + names + dirty;
   }
 
   function totalsHtml(session) {
