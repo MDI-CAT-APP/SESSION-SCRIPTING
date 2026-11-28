@@ -51,10 +51,6 @@ body[data-view="live"] {
   padding-bottom: calc(var(--footer-h) + var(--safe-bottom) + 18px);
 }
 
-body[data-view="live"] main {
-  padding-top: 32px;
-}
-
 body[data-view="live"] .card { margin-bottom: 8px; }
 body[data-view="live"] .strip { margin-bottom: 6px; }
 
@@ -354,18 +350,19 @@ input:focus, textarea:focus, select:focus {
   background:
     linear-gradient(180deg, var(--copper-soft) 0%, var(--card) 42%);
   border-color: #f3d2c2;
-  margin-top: 14px;
+  padding: 8px 12px 10px;
 }
 
 .run-kicker {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   margin: 0;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+  line-height: 1.15;
   text-transform: uppercase;
   color: var(--copper-deep);
 }
@@ -402,8 +399,8 @@ input:focus, textarea:focus, select:focus {
 }
 
 .run-timer {
-  margin: 2px 0 6px;
-  font-size: clamp(2.3rem, 12vw, 3rem);
+  margin: 1px 0 0;
+  font-size: clamp(1.85rem, 8.5vw, 2.15rem);
   font-weight: 760;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -450,8 +447,10 @@ input:focus, textarea:focus, select:focus {
 
 .run-group {
   margin: 4px 0 0;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--teal-deep);
+  line-height: 1.2;
 }
 
 #editDelete { margin-top: 8px; }
@@ -470,7 +469,7 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .run-actions .undo-btn {
