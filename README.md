@@ -67,7 +67,7 @@ It also includes the average group size (only segments that have one) and the cl
 
 If the phone cannot share files, Mail opens with the text report in the body. Attach the CSV yourself. The app names the file to attach.
 
-Save TXT, Save CSV, Share, WhatsApp, and Copy are there as well.
+Share and New session sit on the same card as Email to Maarten. Ending a session still saves the TXT and CSV to Downloads.
 
 ## Past sessions
 

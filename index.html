@@ -21,7 +21,6 @@
     <img class="logo" src="./icons/icon-192.png" width="40" height="40" alt="">
     <div class="brand">
       <h1>Session Script</h1>
-      <p>Meeting Design Institute</p>
     </div>
     <button type="button" class="header-btn" id="pastBtn">Past</button>
   </header>
@@ -152,23 +151,12 @@
     </section>
 
     <section id="viewReport">
-      <div class="card save-card" id="saveConfirm"></div>
-
-      <section class="card" id="exportCard">
-        <div class="card-head">
-          <h2>Send the files</h2>
-        </div>
-        <div class="email-row">
-          <button type="button" class="btn btn-new" id="reportNewBtn">New session</button>
-          <button type="button" class="btn btn-primary btn-email" id="emailMaartenBtn">Email to Maarten</button>
-          <button type="button" class="btn" id="copyBtn">Copy</button>
-        </div>
-        <div class="export-grid">
-          <button type="button" class="btn" id="saveTxtBtn">Save TXT</button>
-          <button type="button" class="btn" id="saveCsvBtn">Save CSV</button>
+      <section class="card save-card" id="saveConfirm">
+        <div id="saveFilesBlock"></div>
+        <div class="send-row">
+          <button type="button" class="btn btn-primary" id="emailMaartenBtn">Email to Maarten</button>
           <button type="button" class="btn" id="shareBtn">Share</button>
-          <button type="button" class="btn" id="whatsappBtn">WhatsApp</button>
-          <button type="button" class="btn btn-block hidden" id="sendServerBtn">Send to server</button>
+          <button type="button" class="btn btn-new" id="reportNewBtn">New session</button>
         </div>
         <p class="status" id="exportStatus" role="status"></p>
       </section>

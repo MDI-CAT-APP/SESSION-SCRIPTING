@@ -1555,26 +1555,13 @@
 
   function saveCardHtml(session) {
     var files = session.lastFiles;
-    var ios = files && files.method === "share";
-    var title = !files ? "Ready to send" : (ios ? "Save to Files" : "Saved to Downloads");
-    var mail = '<span class="save-mail">' + escapeHtml(COORDINATOR) + "</span>";
-    var body;
-    if (!files) {
-      body = "Save the CSV and the TXT, then email both files to " + mail + ".";
-    } else if (ios) {
-      body = "iPhone cannot save files silently. The share sheet opens so you can choose Save to Files. Then email both files to " + mail + ".";
-    } else {
-      body = "";
-    }
     var names = files
       ? '<div class="file-row"><p class="file-name">' + escapeHtml(files.txtName) + '</p><p class="file-name">' + escapeHtml(files.csvName) + "</p></div>"
       : "";
     var dirty = session.dirtyExport
       ? '<p id="dirtyNote">Details changed after these files were saved. Save them again before you email.</p>'
       : "";
-    var bodyHtml = body ? '<p class="save-body">' + body + "</p>" : "";
-    return '<p class="save-kicker">Session ended</p><h3>' + escapeHtml(title) + "</h3>" +
-      bodyHtml + names + dirty;
+    return '<p class="save-kicker">Session ended</p><h3>Files saved to Downloads</h3>' + names + dirty;
   }
 
   function totalsHtml(session) {
@@ -1651,7 +1638,7 @@
 
   function renderReport(session) {
     if (!session) return;
-    $("saveConfirm").innerHTML = saveCardHtml(session);
+    $("saveFilesBlock").innerHTML = saveCardHtml(session);
     $("totalsCard").innerHTML = totalsHtml(session);
     renderLog($("reportLog"), null, session);
     $("reportPreview").value = buildReport(session);
@@ -1754,7 +1741,6 @@
     if (view === "live") renderLive(session);
     if (view === "report") renderReport(session);
     if (view === "past") renderPast();
-    $("sendServerBtn").classList.toggle("hidden", !serverAvailable);
   }
 
   function openEdit(id) {
@@ -2045,15 +2031,7 @@
     });
 
     $("emailMaartenBtn").addEventListener("click", function () { emailToMaarten(currentSession()); });
-    $("saveTxtBtn").addEventListener("click", function () { saveSingle("txt"); });
-    $("saveCsvBtn").addEventListener("click", function () { saveSingle("csv"); });
     $("shareBtn").addEventListener("click", function () { shareReport(currentSession()); });
-    $("whatsappBtn").addEventListener("click", function () { openWhatsApp(currentSession()); });
-    $("copyBtn").addEventListener("click", function () {
-      var session = currentSession();
-      if (session) copyText(buildReport(session));
-    });
-    $("sendServerBtn").addEventListener("click", sendToServer);
 
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
@@ -2084,11 +2062,9 @@
       .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
       .then(function (data) {
         serverAvailable = !!(data && data.ok);
-        $("sendServerBtn").classList.toggle("hidden", !serverAvailable);
       })
       .catch(function () {
         serverAvailable = false;
-        $("sendServerBtn").classList.add("hidden");
       });
   }
 
