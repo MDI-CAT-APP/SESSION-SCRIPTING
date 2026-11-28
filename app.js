@@ -991,8 +991,6 @@
     }
     captureRunningFields();
     startSegment(session, type, when, {});
-    var started = runningSegment(currentSession());
-    if (started) openNoteSheet(started);
     buzz();
   }
 
@@ -1030,8 +1028,8 @@
     $("otherStart").textContent = formatHMS(when);
     $("otherText").value = "";
     $("otherGroup").value = "";
-    $("otherNote").value = "";
     $("otherSave").disabled = true;
+    $("otherPrompt").classList.remove("hidden");
     markOtherQuick("otherQuick", "");
     openModal("otherModal");
     buzz();
@@ -1055,7 +1053,7 @@
       otherLabel: label,
       groupSize: size,
       groupSizeAvg: size != null ? String(size) : "",
-      note: $("otherNote").value.trim()
+      note: ""
     });
   }
 
@@ -2115,8 +2113,10 @@
     $("reportLog").addEventListener("click", onLogClick);
 
     $("otherText").addEventListener("input", function () {
-      $("otherSave").disabled = !$("otherText").value.trim();
-      markOtherQuick("otherQuick", $("otherText").value.trim());
+      var text = $("otherText").value.trim();
+      $("otherSave").disabled = !text;
+      $("otherPrompt").classList.toggle("hidden", !!text);
+      markOtherQuick("otherQuick", text);
     });
     bindOtherQuick("otherQuick", "otherText", "otherSave");
     $("editOther").addEventListener("input", function () {

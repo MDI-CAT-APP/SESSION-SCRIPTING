@@ -172,6 +172,7 @@ label, .label {
 }
 
 .opt { font-weight: 600; color: var(--muted); }
+.req { font-weight: 700; color: var(--danger); }
 
 input[type="text"],
 input[type="email"],
@@ -492,6 +493,16 @@ input:focus, textarea:focus, select:focus {
   padding: 6px 10px;
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+#runNotesBtn {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fffefb;
 }
 
 .run-empty-copy + .undo-btn { margin-top: 10px; }

@@ -220,19 +220,16 @@
         <button type="button" class="btn btn-ghost" id="otherCancel">Cancel</button>
       </div>
       <div class="field">
-        <label for="otherText">What is happening?</label>
+        <label for="otherText">Note <span class="req">Required</span></label>
+        <p class="hint" id="otherPrompt">Describe what is happening</p>
         <div class="chip-row" id="otherQuick">
           <button type="button" class="chip" data-other-quick="Drawing">Drawing</button>
         </div>
-        <textarea id="otherText" rows="2" placeholder="e.g. Role play in groups of four" data-autofocus></textarea>
+        <textarea id="otherText" rows="2" placeholder="Describe what is happening" data-autofocus required></textarea>
       </div>
       <div class="field">
         <label for="otherGroup">Group size <span class="opt">(optional)</span></label>
         <input type="number" id="otherGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
-      </div>
-      <div class="field">
-        <label for="otherNote">Note <span class="opt">(optional)</span></label>
-        <textarea id="otherNote" rows="2" placeholder="e.g. Feedback from each group"></textarea>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="otherSave" disabled>Save details</button>
     </div>

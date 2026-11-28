@@ -12,13 +12,13 @@ Open `index.html` on the phone, or run the optional server below and open that a
 2. Tap **Next**. That opens the activity screen and does not start the clock.
 3. Tap an activity to start timing. That first tap is the actual start, and the first activity begins then. Each later tap ends the activity that was running and starts the next one.
 
-Activities: Introduction, Presentation, Conversations (CAT), Participant question, Q&A, Participants feedback, Survey, Closing remarks, and Other activity. Older logs stored CAT as Conversation and Participants feedback as Feedback; the phone still keeps those keys and shows the current names. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
+Activities: Introduction, Presentation, Conversations (CAT), Participant question, Q&A, Participants feedback, Survey, Closing remarks, and Other activity. Older logs stored CAT as Conversation and Participants feedback as Feedback; the phone still keeps those keys and shows the current names. Tapping an activity starts it at once. Other activity opens a sheet first: the note is required, Cancel leaves the previous activity running, and Drawing is a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
 
 The on-screen log is a dense list: one 13px line per activity, name and length only. A running line shows the live length. A note or group size is shortened on that same line. The full text, group size, and start time are in Edit. Start and end times stay in the TXT and CSV files.
 
 A second tap on the same activity within 2 seconds is ignored. **Undo last tap** removes the last activity and starts the previous one again.
 
-Every new line opens an optional note. You can skip it, type it immediately, change it on the running line, or edit it later. The note is kept in the archive and in the TXT and CSV files.
+**Note** on the running card opens an optional note for the activity that is running. You can skip it or save it, and you can change it later from Edit. The note is kept in the archive and in the TXT and CSV files.
 
 **Edit** on a line can change the activity, the note, and the group size. **Delete line** asks you to confirm, then removes that line and keeps the timeline continuous: the previous line extends to the next line’s start. If you delete the line that is still running, the previous line is running again.
 
