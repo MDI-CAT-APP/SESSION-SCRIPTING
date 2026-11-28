@@ -1,6 +1,6 @@
 {
-  "name": "Session Script",
-  "short_name": "Session Script",
+  "name": "Live Session Scripting",
+  "short_name": "Live Scripting",
   "description": "Time each part of a conference session and export a text report and a spreadsheet.",
   "start_url": "./index.html",
   "scope": "./",
