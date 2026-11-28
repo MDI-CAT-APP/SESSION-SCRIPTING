@@ -444,8 +444,8 @@ input:focus, textarea:focus, select:focus {
 
 .activity-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .activity-grid button {
@@ -453,34 +453,42 @@ input:focus, textarea:focus, select:focus {
   appearance: none;
   border: 1px solid var(--line);
   background: #fff;
-  border-radius: 14px;
-  min-height: 58px;
-  padding: 8px 10px 8px 12px;
-  text-align: left;
-  font-weight: 780;
-  font-size: 0.98rem;
+  border-radius: 12px;
+  min-height: 0;
+  padding: 6px 4px 7px;
+  text-align: center;
+  font-weight: 750;
+  font-size: 0.72rem;
   line-height: 1.15;
   color: var(--teal-deep);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
   min-width: 0;
+  overflow: visible;
 }
 
 .activity-grid button .activity-label {
   display: block;
   width: 100%;
   max-width: 100%;
-  font-size: 0.76rem;
-  font-weight: 750;
+  min-width: 0;
+  font-size: inherit;
+  font-weight: inherit;
   line-height: 1.15;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .activity-grid button svg {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
