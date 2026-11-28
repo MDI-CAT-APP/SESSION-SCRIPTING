@@ -1645,6 +1645,13 @@
       undo.disabled = !currentSession().segments.length;
       undo.addEventListener("click", undoLast);
     }
+    var notes = $("runNotesBtn");
+    if (notes) {
+      notes.addEventListener("click", function () {
+        var live = runningSegment(currentSession());
+        if (live) openNoteSheet(live);
+      });
+    }
     if (note) {
       note.value = seg && seg.note ? seg.note : "";
       note.addEventListener("input", function () {
@@ -1699,13 +1706,13 @@
     var groupLine = groupPlain(seg);
     var groupField = groupLine ? '<p class="run-group">' + escapeHtml(groupLine) + "</p>" : "";
     card.innerHTML =
-      '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span> Running</p>' +
-      '<h3 class="run-name">' + escapeHtml(segmentLabel(seg)) + "</h3>" +
+      '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span><span>Running</span><span class="run-kicker-sep" aria-hidden="true">·</span><span class="run-kicker-name">' + escapeHtml(segmentLabel(seg)) + "</span></p>" +
       '<p class="run-timer" id="runTimer">' + escapeHtml(formatElapsed(seg.start)) + "</p>" +
-      groupField +
-      '<div class="field"><div class="note-row"><label for="runNote">Note <span class="opt">(optional)</span></label>' +
-      '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button></div>' +
-      '<textarea id="runNote" rows="1" placeholder="Anything worth remembering"></textarea></div>';
+      '<div class="run-actions">' +
+        '<button type="button" class="undo-btn" id="runNotesBtn">Notes</button>' +
+        '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>' +
+      "</div>" +
+      groupField;
     bindRunning(seg);
   }
 

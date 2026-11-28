@@ -51,6 +51,10 @@ body[data-view="live"] {
   padding-bottom: calc(var(--footer-h) + var(--safe-bottom) + 18px);
 }
 
+body[data-view="live"] main {
+  padding-top: 32px;
+}
+
 body[data-view="live"] .card { margin-bottom: 8px; }
 body[data-view="live"] .strip { margin-bottom: 6px; }
 
@@ -350,18 +354,29 @@ input:focus, textarea:focus, select:focus {
   background:
     linear-gradient(180deg, var(--copper-soft) 0%, var(--card) 42%);
   border-color: #f3d2c2;
+  margin-top: 14px;
 }
 
 .run-kicker {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--copper-deep);
+}
+
+.run-kicker-name {
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  line-height: 1.2;
 }
 
 .run-dot {
@@ -450,6 +465,18 @@ input:focus, textarea:focus, select:focus {
 }
 
 .note-row label { margin-bottom: 0; }
+
+.run-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.run-actions .undo-btn {
+  width: 100%;
+  min-height: 44px;
+}
 
 .run-empty-copy + .undo-btn { margin-top: 10px; }
 
