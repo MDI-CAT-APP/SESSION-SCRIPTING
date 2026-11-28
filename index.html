@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Session Script">
   <meta name="description" content="Time each part of a conference session. Session Script stays on your phone and exports a text report and a spreadsheet.">
-  <title>Live Session Scripting</title>
+  <title>Live Session Activity Report</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
@@ -18,9 +18,21 @@
 </head>
 <body data-view="setup">
   <header class="app-header">
-    <img class="logo" src="./icons/icon-192.png" width="40" height="40" alt="">
+    <svg class="logo" viewBox="0 0 512 512" width="40" height="40" aria-hidden="true">
+      <rect x="62" y="44" width="388" height="450" rx="36" fill="#FFF8EB" stroke="#2B2B2B" stroke-width="14"></rect>
+      <ellipse cx="127" cy="40" rx="17" ry="24" fill="#C85A28"></ellipse>
+      <ellipse cx="191" cy="40" rx="17" ry="24" fill="#C85A28"></ellipse>
+      <ellipse cx="256" cy="40" rx="17" ry="24" fill="#C85A28"></ellipse>
+      <ellipse cx="321" cy="40" rx="17" ry="24" fill="#C85A28"></ellipse>
+      <ellipse cx="386" cy="40" rx="17" ry="24" fill="#C85A28"></ellipse>
+      <rect x="126" y="133" width="261" height="15" fill="#3E5A6C"></rect>
+      <rect x="126" y="211" width="261" height="15" fill="#3E5A6C"></rect>
+      <rect x="126" y="289" width="261" height="15" fill="#3E5A6C"></rect>
+      <rect x="126" y="367" width="261" height="15" fill="#3E5A6C"></rect>
+      <rect x="126" y="445" width="261" height="15" fill="#3E5A6C"></rect>
+    </svg>
     <div class="brand">
-      <h1>Live Session Scripting</h1>
+      <h1>Live Session Activity Report</h1>
     </div>
     <button type="button" class="header-btn" id="pastBtn">Past</button>
   </header>

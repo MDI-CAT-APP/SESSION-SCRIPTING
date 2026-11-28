@@ -78,12 +78,11 @@ img { max-width: 100%; display: block; }
   color: #fffefb;
 }
 
-.app-header img.logo {
+.app-header svg.logo {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
   flex: 0 0 auto;
-  background: #fffefb;
+  display: block;
 }
 
 .brand { flex: 1; min-width: 0; }
