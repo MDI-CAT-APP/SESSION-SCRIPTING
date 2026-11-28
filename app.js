@@ -1707,10 +1707,12 @@
     var groupField = groupLine ? '<p class="run-group">' + escapeHtml(groupLine) + "</p>" : "";
     card.innerHTML =
       '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span><span>Running</span><span class="run-kicker-sep" aria-hidden="true">·</span><span class="run-kicker-name">' + escapeHtml(segmentLabel(seg)) + "</span></p>" +
-      '<p class="run-timer" id="runTimer">' + escapeHtml(formatElapsed(seg.start)) + "</p>" +
-      '<div class="run-actions">' +
-        '<button type="button" class="undo-btn" id="runNotesBtn">Notes</button>' +
-        '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>' +
+      '<div class="run-clock-row">' +
+        '<p class="run-timer" id="runTimer">' + escapeHtml(formatElapsed(seg.start)) + "</p>" +
+        '<div class="run-actions">' +
+          '<button type="button" class="undo-btn" id="runNotesBtn">Note</button>' +
+          '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>' +
+        "</div>" +
       "</div>" +
       groupField;
     bindRunning(seg);

@@ -398,8 +398,16 @@ input:focus, textarea:focus, select:focus {
   font-variant-numeric: tabular-nums;
 }
 
+.run-clock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .run-timer {
-  margin: 1px 0 0;
+  margin: 0;
+  flex: 0 0 auto;
   font-size: clamp(1.85rem, 8.5vw, 2.15rem);
   font-weight: 760;
   letter-spacing: -0.04em;
@@ -466,15 +474,20 @@ input:focus, textarea:focus, select:focus {
 .note-row label { margin-bottom: 0; }
 
 .run-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0 0 0 auto;
+  min-width: 0;
 }
 
 .run-actions .undo-btn {
-  width: 100%;
-  min-height: 44px;
+  width: auto;
+  min-height: 40px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .run-empty-copy + .undo-btn { margin-top: 10px; }
