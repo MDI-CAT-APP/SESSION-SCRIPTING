@@ -57,7 +57,7 @@ SEGMENT_TYPES = [
     "Conversations (CAT)",
     "Participant question",
     "Q&A",
-    "Participant feedback",
+    "Participants feedback",
     "Survey",
     "Closing remarks",
     "Other: Drawing",
@@ -67,7 +67,7 @@ SEGMENT_TYPES = [
 BUCKETS = [
     ("Presentation (incl. introduction)", ["Introduction", "Presentation"]),
     ("Conversations (CAT)", ["Conversations (CAT)", "Conversations About the Topic (CAT)", "Conversation"]),
-    ("Participant feedback", ["Participant feedback", "Feedback"]),
+    ("Participants feedback", ["Participants feedback", "Participant feedback", "Feedback"]),
     ("Q&A (incl. participant questions)", ["Q&A", "Participant question"]),
     ("Survey", ["Survey"]),
     ("Closing remarks", ["Closing remarks"]),
@@ -81,8 +81,8 @@ def canonical_segment_type(row: dict[str, str]) -> str:
     note = (row.get("note") or "").strip()
     if name in {"Conversation", "Conversations (CAT)", "Conversations About the Topic (CAT)"}:
         return "Conversations (CAT)"
-    if name in {"Feedback", "Participant feedback"}:
-        return "Participant feedback"
+    if name in {"Feedback", "Participant feedback", "Participants feedback"}:
+        return "Participants feedback"
     if name == "Drawing" or name == "Other: Drawing":
         return "Other: Drawing"
     if name == "Other activity" and (note == "Drawing" or note.startswith("Drawing - ")):
