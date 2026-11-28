@@ -254,6 +254,21 @@ input:focus, textarea:focus, select:focus {
 
 .btn-primary:disabled { opacity: 0.4; }
 
+.btn-new,
+.email-row .btn-new {
+  background: #c45100;
+  border-color: #c45100;
+  color: #fff;
+  font-weight: 800;
+}
+
+.btn-new:active,
+.email-row .btn-new:active {
+  background: #a34300;
+  border-color: #a34300;
+  color: #fff;
+}
+
 .btn-ghost {
   background: transparent;
   border-color: transparent;
