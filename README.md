@@ -36,10 +36,10 @@ A slider runs from 0 to 100 in steps of 10, starting at 50. The thumb is the sha
 
 When you confirm, the running activity ends and the session is archived on the phone. The app then writes two files:
 
-`YYMMDD session-title observer.txt`
-`YYMMDD session-title observer.csv`
+`YYMMDD_Session-Title_Firstname.txt`
+`YYMMDD_Session-Title_Firstname.csv`
 
-Example: `261127 opening-keynote amina-yusuf.txt`.
+Example: `261128_Opening-Keynote_Maarten.txt`. The first name is the first word of the observer field. If the title is empty the name uses `session`. If the observer field is empty, that part is left off.
 
 - **Android Chrome** saves both files to Downloads.
 - **iPhone** cannot save a file silently. The share sheet opens so you can choose **Save to Files**. Save both the TXT and the CSV, then email them.

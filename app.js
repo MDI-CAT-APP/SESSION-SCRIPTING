@@ -169,11 +169,11 @@
     var t = String(value || "")
       .trim()
       .replace(/[^\w\s-]+/g, "")
-      .replace(/\s+/g, "-")
+      .replace(/[\s_]+/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "")
-      .toLowerCase()
-      .slice(0, 40);
+      .slice(0, 40)
+      .replace(/-+$/g, "");
     return t || fallback;
   }
 
@@ -508,7 +508,12 @@
     var when = parseDatetimeLocal(session.plannedStart);
     if (!when && session.segments.length) when = new Date(session.segments[0].start);
     if (!when) when = new Date();
-    return yymmdd(when) + " " + slugPart(session.title, "session") + " " + slugPart(session.observer, "observer");
+    var title = slugPart(session.title, "session");
+    var firstWord = String(session.observer || "").trim().split(/\s+/)[0] || "";
+    var first = slugPart(firstWord, "");
+    var name = yymmdd(when) + "_" + title;
+    if (first) name += "_" + first;
+    return name;
   }
 
   function csvCell(value) {
