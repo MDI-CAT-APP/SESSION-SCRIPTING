@@ -766,6 +766,52 @@ body[data-view="live"] .live-footer { display: block; }
   font-variant-numeric: tabular-nums;
 }
 
+.archive-chart {
+  padding: 8px 10px 6px;
+  margin-bottom: 8px;
+}
+
+.archive-summary {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  color: var(--ink-soft);
+}
+
+.archive-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.archive-row { margin: 0 0 6px; }
+
+.archive-row .top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.archive-row .name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.archive-row .nums {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  color: var(--teal-deep);
+  white-space: nowrap;
+}
+
+.archive-chart .bar { height: 6px; margin-top: 3px; }
+
+#deleteAllBtn { margin-top: 8px; }
+
 .total-row { margin: 0 0 10px; }
 
 .total-row .top {

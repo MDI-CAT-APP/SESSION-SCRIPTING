@@ -1646,12 +1646,84 @@
     status.classList.toggle("error", exportNote.error);
   }
 
+  function listedSessions() {
+    return state.sessions.filter(isListed);
+  }
+
+  function isRunningSession(session) {
+    return !!(session && session.status === "live");
+  }
+
+  function deletableSessions() {
+    return listedSessions().filter(function (session) { return !isRunningSession(session); });
+  }
+
+  function archiveChartHtml() {
+    var sessions = listedSessions();
+    var byType = {};
+    ACTIVITY_TYPES.forEach(function (type) { byType[type] = 0; });
+    var total = 0;
+    sessions.forEach(function (session) {
+      session.segments.forEach(function (seg) {
+        var secs = segmentSeconds(seg);
+        if (secs == null) return;
+        var type = ACTIVITY_TYPES.indexOf(seg.type) === -1 ? "Other activity" : seg.type;
+        byType[type] += secs;
+        total += secs;
+      });
+    });
+    var types = ACTIVITY_TYPES.filter(function (type) { return byType[type] > 0; });
+    var tenths = shareTenths(types.map(function (type) { return byType[type]; }), total);
+    var countLabel = sessions.length === 1 ? "1 session" : sessions.length + " sessions";
+    var summary = countLabel + " · " + (total ? formatSeconds(total) : "0 min");
+    var rows = types.map(function (type, index) {
+      var pct = (tenths[index] / 10).toFixed(1);
+      return '<div class="archive-row" data-activity="' + escapeHtml(activityLabel(type)) + '" data-seconds="' + byType[type] + '" data-percent="' + pct + '">' +
+        '<div class="top"><span class="name">' + escapeHtml(activityLabel(type)) + '</span><span class="nums">' +
+        escapeHtml(formatSeconds(byType[type])) + " · " + pct + "%</span></div>" +
+        '<div class="bar" aria-hidden="true"><span style="width:' + pct + '%"></span></div></div>';
+    }).join("");
+    if (!rows) rows = '<p class="archive-empty">No timed activity yet.</p>';
+    return '<p class="archive-summary" data-sessions="' + sessions.length + '" data-total-seconds="' + total + '">' + escapeHtml(summary) + "</p>" + rows;
+  }
+
   function renderPast() {
-    var list = state.sessions.filter(isListed).sort(function (a, b) {
+    var list = listedSessions().sort(function (a, b) {
       return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
     });
+    $("archiveChart").innerHTML = archiveChartHtml();
     $("pastEmpty").classList.toggle("hidden", list.length > 0);
     $("pastList").innerHTML = list.map(pastCardHtml).join("");
+    $("deleteAllBtn").classList.toggle("hidden", deletableSessions().length === 0);
+  }
+
+  function askDeleteAll() {
+    var count = deletableSessions().length;
+    if (!count) return;
+    var noun = count === 1 ? "session" : "sessions";
+    var running = state.sessions.some(isRunningSession);
+    var extra = running ? " The session that is still running stays." : "";
+    $("deleteAllBody").textContent = count + " " + noun + " will be deleted from this phone." + extra + " This cannot be undone.";
+    openModal("deleteAllModal");
+  }
+
+  function confirmDeleteAll() {
+    var removed = deletableSessions().length;
+    if (!removed) {
+      closeModal("deleteAllModal");
+      return;
+    }
+    state.sessions = state.sessions.filter(function (session) {
+      return isRunningSession(session) || !isListed(session);
+    });
+    if (!findSession(state.currentId)) {
+      var live = state.sessions.filter(isRunningSession)[0];
+      state.currentId = live ? live.id : null;
+    }
+    save();
+    closeModal("deleteAllModal");
+    render();
+    toast(removed === 1 ? "1 session deleted" : removed + " sessions deleted");
   }
 
   function render() {
@@ -1939,6 +2011,12 @@
     });
 
     $("pastNewBtn").addEventListener("click", requestNewSession);
+    $("deleteAllBtn").addEventListener("click", askDeleteAll);
+    $("deleteAllKeep").addEventListener("click", function () { closeModal("deleteAllModal"); });
+    $("deleteAllConfirm").addEventListener("click", confirmDeleteAll);
+    $("deleteAllModal").addEventListener("click", function (ev) {
+      if (ev.target === $("deleteAllModal")) closeModal("deleteAllModal");
+    });
     $("reportNewBtn").addEventListener("click", requestNewSession);
     $("pastList").addEventListener("click", function (ev) {
       var button = ev.target.closest("button");
@@ -1974,7 +2052,8 @@
       } else if (!$("deleteModal").classList.contains("hidden")) {
         deletingId = null;
         closeModal("deleteModal");
-      } else if (!$("newModal").classList.contains("hidden")) closeModal("newModal");
+      } else if (!$("deleteAllModal").classList.contains("hidden")) closeModal("deleteAllModal");
+      else if (!$("newModal").classList.contains("hidden")) closeModal("newModal");
     });
 
     window.addEventListener("beforeunload", function () {

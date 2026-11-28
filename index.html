@@ -201,10 +201,12 @@
       <div class="card-head page-head">
         <h2>Past sessions</h2>
       </div>
-      <p class="lede">Ended sessions stay on this phone. Open one to export it again or email it. Nothing is removed unless you delete that session.</p>
+      <section class="card archive-chart" id="archiveChart" aria-label="Totals for all sessions"></section>
+      <p class="lede">Ended sessions stay on this phone. Open one to export it again or email it. Nothing is removed unless you delete a session.</p>
       <button type="button" class="btn btn-primary btn-block" id="pastNewBtn">New session</button>
       <div id="pastList"></div>
       <p class="log-empty hidden" id="pastEmpty">No sessions on this phone yet.</p>
+      <button type="button" class="btn btn-danger btn-block hidden" id="deleteAllBtn">Delete all sessions</button>
     </section>
   </main>
 
@@ -367,6 +369,18 @@
       <div class="modal-actions">
         <button type="button" class="btn" id="lineDeleteKeep">Keep</button>
         <button type="button" class="btn btn-danger" id="lineDeleteConfirm">Delete line</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="deleteAllModal" role="dialog" aria-modal="true" aria-labelledby="deleteAllTitle">
+    <div class="modal" tabindex="-1">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 id="deleteAllTitle">Delete all sessions?</h2>
+      <p id="deleteAllBody"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="deleteAllKeep">Keep</button>
+        <button type="button" class="btn btn-danger" id="deleteAllConfirm">Delete all sessions</button>
       </div>
     </div>
   </div>
