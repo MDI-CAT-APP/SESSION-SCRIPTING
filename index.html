@@ -158,14 +158,16 @@
         <div class="card-head">
           <h2>Send the files</h2>
         </div>
-        <button type="button" class="btn btn-primary btn-block btn-email" id="emailMaartenBtn">Email to Maarten</button>
+        <div class="email-row">
+          <button type="button" class="btn btn-primary btn-email" id="emailMaartenBtn">Email to Maarten</button>
+          <button type="button" class="btn" id="copyBtn">Copy</button>
+        </div>
         <p class="hint email-hint">Shares the CSV and the TXT with <strong>maarten.vanneste@meetingsupport.org</strong> in the title. If this phone cannot share files, Mail opens with the text report. Attach the CSV yourself.</p>
         <div class="export-grid">
           <button type="button" class="btn" id="saveTxtBtn">Save TXT</button>
           <button type="button" class="btn" id="saveCsvBtn">Save CSV</button>
           <button type="button" class="btn" id="shareBtn">Share</button>
           <button type="button" class="btn" id="whatsappBtn">WhatsApp</button>
-          <button type="button" class="btn btn-block" id="copyBtn">Copy</button>
           <button type="button" class="btn btn-block hidden" id="sendServerBtn">Send to server</button>
         </div>
         <p class="status" id="exportStatus" role="status"></p>
