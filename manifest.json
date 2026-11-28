@@ -1,7 +1,7 @@
 {
-  "name": "Session Script",
-  "short_name": "Session Script",
-  "description": "Timestamp what happens in a session or presentation.",
+  "name": "Session Activity Report",
+  "short_name": "Activity Report",
+  "description": "Time each part of a conference session and export a text report and a spreadsheet.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
