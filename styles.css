@@ -54,6 +54,54 @@ body[data-view="live"] {
 body[data-view="live"] .card { margin-bottom: 8px; }
 body[data-view="live"] .strip { margin-bottom: 6px; }
 
+body[data-view="setup"] main {
+  padding: 12px 8px 12px;
+  max-width: 720px;
+}
+
+#setupForm.card {
+  padding: 22px 18px 20px;
+}
+
+#setupForm .card-head {
+  margin-bottom: 14px;
+}
+
+#setupForm .card-head h2 {
+  font-size: 0.95rem;
+}
+
+#setupForm .field {
+  margin-bottom: 14px;
+}
+
+#setupForm label {
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+#setupForm input,
+#setupForm textarea {
+  font-size: 18px;
+  min-height: 52px;
+  padding: 12px 14px;
+}
+
+#setupForm textarea {
+  min-height: 84px;
+}
+
+#setupForm label[for="sessionTitle"] {
+  font-size: 1.2rem;
+}
+
+#setupForm #sessionTitle {
+  font-size: 22px;
+  font-weight: 650;
+  min-height: 68px;
+  padding: 16px 16px;
+}
+
 button, input, textarea, select { font: inherit; color: inherit; }
 
 input, textarea, select { font-size: 16px; }
