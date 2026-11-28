@@ -367,9 +367,13 @@ input:focus, textarea:focus, select:focus {
   color: var(--copper-deep);
 }
 
+.run-kicker-label {
+  font-size: 0.68rem;
+}
+
 .run-kicker-name {
-  font-size: 0.82rem;
-  font-weight: 650;
+  font-size: 1rem;
+  font-weight: 750;
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink);
