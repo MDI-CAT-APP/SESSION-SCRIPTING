@@ -806,17 +806,55 @@
     try { navigator.vibrate(12); } catch (e) { /* ignore */ }
   }
 
+  function noteSheetEl() {
+    return $("noteModal").querySelector(".modal");
+  }
+
+  function fitNoteSheet() {
+    var sheet = noteSheetEl();
+    if (!sheet || $("noteModal").classList.contains("hidden")) return;
+    var vv = window.visualViewport;
+    if (!vv) return;
+    var height = Math.max(160, Math.floor(vv.height - 8));
+    sheet.style.maxHeight = height + "px";
+    var obscured = window.innerHeight - vv.offsetTop - vv.height;
+    sheet.style.marginBottom = obscured > 1 ? Math.round(obscured) + "px" : "0px";
+  }
+
+  function watchNoteViewport(on) {
+    var vv = window.visualViewport;
+    if (vv) {
+      vv.removeEventListener("resize", fitNoteSheet);
+      vv.removeEventListener("scroll", fitNoteSheet);
+    }
+    if (!on) {
+      var sheet = noteSheetEl();
+      if (sheet) {
+        sheet.style.maxHeight = "";
+        sheet.style.marginBottom = "";
+      }
+      return;
+    }
+    if (vv) {
+      vv.addEventListener("resize", fitNoteSheet);
+      vv.addEventListener("scroll", fitNoteSheet);
+    }
+    fitNoteSheet();
+  }
+
   function openModal(id) {
     lastFocused = document.activeElement;
     $(id).classList.remove("hidden");
     document.body.classList.add("modal-open");
     var dialog = $(id).querySelector(".modal");
     if (dialog && dialog.focus) dialog.focus();
+    if (id === "noteModal") watchNoteViewport(true);
     var auto = $(id).querySelector("[data-autofocus]");
     if (auto) setTimeout(function () { try { auto.focus(); } catch (e) { /* ignore */ } }, 40);
   }
 
   function closeModal(id) {
+    if (id === "noteModal") watchNoteViewport(false);
     $(id).classList.add("hidden");
     if (!document.querySelector(".modal-backdrop:not(.hidden)")) {
       document.body.classList.remove("modal-open");
@@ -1010,7 +1048,6 @@
   function openNoteSheet(seg) {
     noteSegmentId = seg.id;
     $("noteTitle").textContent = activityLabel(seg.type);
-    $("noteStart").textContent = formatHMS(new Date(seg.start));
     $("noteText").value = seg.note || "";
     var conversation = seg.type === "Conversation";
     $("noteGroupWrap").classList.toggle("hidden", !conversation);

@@ -1014,6 +1014,41 @@ body[data-view="live"] .live-footer { display: block; }
   margin-top: 14px;
 }
 
+.note-sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-bottom: calc(12px + var(--safe-bottom));
+}
+
+.note-sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  background: var(--card);
+}
+
+.note-sheet-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.note-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-top: 10px;
+  margin-bottom: 0;
+  background: var(--card);
+}
+
+.note-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 10px;
+}
+
 .toast {
   position: fixed;
   left: 50%;
