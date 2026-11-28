@@ -277,6 +277,8 @@ input:focus, textarea:focus, select:focus {
 
 .btn-block { width: 100%; }
 
+#editSessionBtn { margin-top: 10px; }
+
 .send-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

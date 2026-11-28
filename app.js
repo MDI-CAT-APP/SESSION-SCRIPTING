@@ -1146,17 +1146,28 @@
   }
 
   function downloadText(name, text, mime, bom) {
-    var blob = new Blob([(bom ? "\ufeff" : "") + text], { type: mime + ";charset=utf-8" });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
+    downloadBoth([{ name: name, text: text, mime: mime, bom: bom }]);
+  }
+
+  function downloadBoth(jobs) {
+    var created = [];
+    for (var i = 0; i < jobs.length; i++) {
+      var job = jobs[i];
+      var blob = new Blob([(job.bom ? "\ufeff" : "") + job.text], { type: job.mime + ";charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = job.name;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      created.push({ link: link, url: url });
+    }
+    for (var j = 0; j < created.length; j++) created[j].link.click();
     setTimeout(function () {
-      link.remove();
-      URL.revokeObjectURL(url);
+      for (var k = 0; k < created.length; k++) {
+        created[k].link.remove();
+        URL.revokeObjectURL(created[k].url);
+      }
     }, 2500);
   }
 
@@ -1171,8 +1182,6 @@
     };
     session.dirtyExport = false;
     exportNote = { text: "", error: false };
-    save();
-    render();
     if (ios) {
       var packed = [files.txtFile, files.csvFile];
       if (canShareFiles(packed)) {
@@ -1182,15 +1191,19 @@
           text: "Save both files to Files, then email them to " + COORDINATOR + ".\n\n" + files.txtName + "\n" + files.csvName
         }).catch(function (err) {
           if (err && err.name === "AbortError") return;
-          setStatus("The share sheet did not open. Use Save TXT and Save CSV, then email both files to " + COORDINATOR + ".", true);
+          setStatus("The share sheet did not open. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
         });
       } else {
-        setStatus("This browser cannot open the share sheet. Use Save TXT and Save CSV, then email both files to " + COORDINATOR + ".", true);
+        setStatus("This browser cannot open the share sheet. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
       }
-      return;
+    } else {
+      downloadBoth([
+        { name: files.txtName, text: files.txt, mime: "text/plain", bom: false },
+        { name: files.csvName, text: files.csv, mime: "text/csv", bom: true }
+      ]);
     }
-    downloadText(files.txtName, files.txt, "text/plain", false);
-    downloadText(files.csvName, files.csv, "text/csv", true);
+    save();
+    render();
   }
 
   function finalizeSession() {
@@ -1430,6 +1443,54 @@
     exportNote = { text: "", error: false };
     save();
     render();
+  }
+
+  function openSessionSetup() {
+    var session = currentSession();
+    if (!session || session.status !== "ended") return;
+    $("setupEditTitle").value = session.title || "";
+    $("setupEditSpeakers").value = session.speakers || "";
+    $("setupEditRoom").value = session.roomName || "";
+    $("setupEditPlanned").value = session.plannedStart || "";
+    $("setupEditObserver").value = session.observer || "";
+    $("setupEditParticipants").value = session.estimatedParticipants == null ? "" : String(session.estimatedParticipants);
+    $("setupEditError").textContent = "";
+    openModal("setupEditModal");
+  }
+
+  function saveSessionSetup() {
+    var session = currentSession();
+    if (!session || session.status !== "ended") return;
+    var title = $("setupEditTitle").value.trim();
+    var observer = $("setupEditObserver").value.trim();
+    var planned = $("setupEditPlanned").value;
+    if (!title) {
+      $("setupEditError").textContent = "Add a session title.";
+      $("setupEditTitle").focus();
+      return;
+    }
+    if (!observer) {
+      $("setupEditError").textContent = "Add your name so the file can be identified.";
+      $("setupEditObserver").focus();
+      return;
+    }
+    if (!planned) {
+      $("setupEditError").textContent = "Add the planned session start.";
+      $("setupEditPlanned").focus();
+      return;
+    }
+    session.title = title;
+    session.speakers = $("setupEditSpeakers").value;
+    session.roomName = $("setupEditRoom").value.trim();
+    session.plannedStart = planned;
+    session.observer = observer;
+    session.estimatedParticipants = parseParticipants($("setupEditParticipants").value);
+    session.updatedAt = new Date().toISOString();
+    session.dirtyExport = true;
+    save();
+    closeModal("setupEditModal");
+    render();
+    toast("Session updated");
   }
 
   function askDelete(id) {
@@ -2086,6 +2147,12 @@
 
     $("emailMaartenBtn").addEventListener("click", function () { emailToMaarten(currentSession()); });
     $("shareBtn").addEventListener("click", function () { shareReport(currentSession()); });
+    $("editSessionBtn").addEventListener("click", openSessionSetup);
+    $("setupEditCancel").addEventListener("click", function () { closeModal("setupEditModal"); });
+    $("setupEditSave").addEventListener("click", saveSessionSetup);
+    $("setupEditModal").addEventListener("click", function (ev) {
+      if (ev.target === $("setupEditModal")) closeModal("setupEditModal");
+    });
 
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
@@ -2100,6 +2167,7 @@
         deletingId = null;
         closeModal("deleteModal");
       } else if (!$("deleteAllModal").classList.contains("hidden")) closeModal("deleteAllModal");
+      else if (!$("setupEditModal").classList.contains("hidden")) closeModal("setupEditModal");
       else if (!$("newModal").classList.contains("hidden")) closeModal("newModal");
     });
 
