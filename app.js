@@ -838,12 +838,12 @@
     }
   }
 
-  function toast(message) {
+  function toast(message, ms) {
     var el = $("toast");
     el.textContent = message;
     el.classList.add("show");
     clearTimeout(toast._t);
-    toast._t = setTimeout(function () { el.classList.remove("show"); }, 2400);
+    toast._t = setTimeout(function () { el.classList.remove("show"); }, ms || 2400);
   }
 
   function setStatus(message, isError) {
@@ -1191,29 +1191,42 @@
   }
 
   function downloadText(name, text, mime, bom) {
-    downloadBoth([{ name: name, text: text, mime: mime, bom: bom }]);
+    return downloadBoth([{ name: name, text: text, mime: mime, bom: bom }]);
+  }
+
+  function clickDownload(job) {
+    var blob = new Blob([(job.bom ? "\ufeff" : "") + job.text], { type: job.mime + ";charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = job.name;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(function () {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 4000);
   }
 
   function downloadBoth(jobs) {
-    var created = [];
-    for (var i = 0; i < jobs.length; i++) {
-      var job = jobs[i];
-      var blob = new Blob([(job.bom ? "\ufeff" : "") + job.text], { type: job.mime + ";charset=utf-8" });
-      var url = URL.createObjectURL(blob);
-      var link = document.createElement("a");
-      link.href = url;
-      link.download = job.name;
-      link.rel = "noopener";
-      document.body.appendChild(link);
-      created.push({ link: link, url: url });
-    }
-    for (var j = 0; j < created.length; j++) created[j].link.click();
-    setTimeout(function () {
-      for (var k = 0; k < created.length; k++) {
-        created[k].link.remove();
-        URL.revokeObjectURL(created[k].url);
+    return new Promise(function (resolve) {
+      var index = 0;
+      function next() {
+        if (index >= jobs.length) {
+          resolve();
+          return;
+        }
+        clickDownload(jobs[index]);
+        index += 1;
+        if (index >= jobs.length) {
+          resolve();
+          return;
+        }
+        setTimeout(next, 1000);
       }
-    }, 2500);
+      next();
+    });
   }
 
   function autoSaveFiles(session) {
@@ -1227,6 +1240,8 @@
     };
     session.dirtyExport = false;
     exportNote = { text: "", error: false };
+    save();
+    render();
     if (ios) {
       var packed = [files.txtFile, files.csvFile];
       if (canShareFiles(packed)) {
@@ -1234,6 +1249,8 @@
           files: packed,
           title: "Session Script — " + COORDINATOR,
           text: "Save both files to Files, then email them to " + COORDINATOR + ".\n\n" + files.txtName + "\n" + files.csvName
+        }).then(function () {
+          toast("Files saved", 3000);
         }).catch(function (err) {
           if (err && err.name === "AbortError") return;
           setStatus("The share sheet did not open. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
@@ -1241,14 +1258,14 @@
       } else {
         setStatus("This browser cannot open the share sheet. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
       }
-    } else {
-      downloadBoth([
-        { name: files.txtName, text: files.txt, mime: "text/plain", bom: false },
-        { name: files.csvName, text: files.csv, mime: "text/csv", bom: true }
-      ]);
+      return;
     }
-    save();
-    render();
+    downloadBoth([
+      { name: files.txtName, text: files.txt, mime: "text/plain", bom: false },
+      { name: files.csvName, text: files.csv, mime: "text/csv", bom: true }
+    ]).then(function () {
+      toast("Files saved", 3000);
+    });
   }
 
   function finalizeSession(storeClose) {
@@ -1275,7 +1292,6 @@
     state.screen = null;
     closeModal("endModal");
     autoSaveFiles(session);
-    toast("Session saved");
   }
 
   function clearDirty(session) {
@@ -1820,7 +1836,7 @@
     var dirty = session.dirtyExport
       ? '<p id="dirtyNote">Details changed after these files were saved. Save them again before you email.</p>'
       : "";
-    return '<p class="save-kicker">Session ended</p><h3>Files saved to Downloads</h3>' + names + dirty;
+    return '<p class="save-kicker">Session ended</p>' + names + dirty;
   }
 
   function totalsHtml(session) {
