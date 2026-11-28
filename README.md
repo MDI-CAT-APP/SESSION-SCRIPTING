@@ -10,13 +10,13 @@ Open `index.html` on the phone, or run the optional server below and open that a
 
 1. Enter the **session title**, **speaker name(s)** (one per line), the **room name**, the **planned start** (date and time), **your name**, and, if you know it, the **estimated nr of participants**.
 2. Tap **Next**. That opens the activity screen and does not start the clock.
-3. Tap an activity to start timing. That first tap is the actual start, and the first segment begins then. Each later tap ends the segment that was running and starts the next one.
+3. Tap an activity to start timing. That first tap is the actual start, and the first activity begins then. Each later tap ends the activity that was running and starts the next one.
 
 Activities: Introduction, Presentation, Conversations About the Topic (CAT), Participant question, Q&A, Participant feedback, Survey, Closing remarks, and Other activity. Older logs stored CAT as Conversation and Participant feedback as Feedback; the phone still keeps those keys and shows the current names. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
 
 The on-screen log is a dense list: one 13px line per activity, name and length only. A running line shows the live length. A note or group size is shortened on that same line. The full text, group size, and start time are in Edit. Start and end times stay in the TXT and CSV files.
 
-A second tap on the same activity within 2 seconds is ignored. **Undo last tap** removes the last segment and starts the previous one again.
+A second tap on the same activity within 2 seconds is ignored. **Undo last tap** removes the last activity and starts the previous one again.
 
 Every new line opens an optional note. You can skip it, type it immediately, change it on the running line, or edit it later. The note is kept in the archive and in the TXT and CSV files.
 
@@ -39,7 +39,7 @@ The log is saved on the phone as you go. Reloading the page does not clear it.
 
 A comment is optional.
 
-When you confirm, the running segment ends and the session is archived on the phone. The app then writes two files:
+When you confirm, the running activity ends and the session is archived on the phone. The app then writes two files:
 
 `YYMMDD session-title observer.txt`
 `YYMMDD session-title observer.csv`
@@ -49,7 +49,7 @@ Example: `261127 opening-keynote amina-yusuf.txt`.
 - **Android Chrome** saves both files to Downloads.
 - **iPhone** cannot save a file silently. The share sheet opens so you can choose **Save to Files**. Save both the TXT and the CSV, then email them.
 
-The report lists every segment and these totals, with the share of the session. A category is left out when its time is 0 seconds. The Past sessions chart does the same:
+The report lists every activity and these totals, with the share of the session. A category is left out when its time is 0 seconds. The Past sessions chart does the same:
 
 - Presentation (including introduction)
 - Conversations About the Topic (CAT)
@@ -59,7 +59,7 @@ The report lists every segment and these totals, with the share of the session. 
 - Closing remarks
 - Other (including Drawing)
 
-It also includes the average group size (only segments that have one) and the closing answer.
+It also includes the average group size (only activities that have one) and the closing answer.
 
 ## Email to Maarten
 

@@ -585,9 +585,9 @@
       lines.push(bucket.label + ": " + formatSeconds(bucket.seconds) + " (" + (bucket.tenths / 10).toFixed(1) + "%)");
     });
     lines.push("Average group size: " + (formatAvg(totals.averageGroup) || "—"));
-    lines.push("", "SEGMENTS");
+    lines.push("", "ACTIVITIES");
     if (!segs.length) {
-      lines.push("(no segments)");
+      lines.push("(no activities)");
     } else {
       segs.forEach(function (seg) {
         lines.push(segmentScriptLine(seg));
@@ -1794,7 +1794,7 @@
     save();
     closeModal("editModal");
     render();
-    toast("Segment updated");
+    toast("Activity updated");
   }
 
   function askDeleteLine() {

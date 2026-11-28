@@ -293,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
             skipped.append(f"{path.name} ({exc})")
             continue
         if not rows:
-            skipped.append(f"{path.name} (no segment rows)")
+            skipped.append(f"{path.name} (no activity rows)")
             continue
         grouped: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
         for row in rows:
@@ -467,7 +467,8 @@ def main(argv: list[str] | None = None) -> int:
         writer.writerows(rows_out)
 
     segment_count = sum(int(session["count"]) for session in session_stats)
-    print(f"Read {len(sessions)} session(s), {segment_count} segment(s).")
+    activity_word = "activity" if segment_count == 1 else "activities"
+    print(f"Read {len(sessions)} session(s), {segment_count} {activity_word}.")
     print(f"Wrote {output}")
     for line in skipped:
         print(f"Skipped {line}", file=sys.stderr)
