@@ -42,6 +42,8 @@
     "session",
     "observer",
     "estimated_participants",
+    "left_right_away_pct",
+    "closing_mixed",
     "room_name",
     "room_speakers",
     "segment_type",
@@ -78,6 +80,7 @@
   var pendingOtherAt = null;
   var noteSegmentId = null;
   var editingId = null;
+  var setupEditCloseTouched = false;
   var deletingId = null;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -523,6 +526,8 @@
         csvCell(session.title || ""),
         csvCell(session.observer || ""),
         session.estimatedParticipants == null ? "" : String(session.estimatedParticipants),
+        closingCsv(session).pct,
+        closingCsv(session).mixed,
         csvCell(session.roomName || ""),
         csvCell(room),
         csvCell(activityLabel(seg.type)),
@@ -546,10 +551,31 @@
     return start + "–" + formatHMS(new Date(seg.end)) + " (" + formatSeconds(secs) + ") " + label + extra;
   }
 
+  function snapLeftPct(value) {
+    var n = Math.round(Number(value) / 10) * 10;
+    if (!isFinite(n)) return 50;
+    if (n < 0) return 0;
+    if (n > 100) return 100;
+    return n;
+  }
+
+  function closingCsv(session) {
+    var closing = session && session.closing;
+    if (!closing || typeof closing.leftRightAwayPct !== "number") return { pct: "", mixed: "" };
+    return { pct: String(closing.leftRightAwayPct), mixed: closing.mixed ? "yes" : "" };
+  }
+
   function closingAnswerText(session) {
     if (!session.closing) return "—";
+    if (typeof session.closing.leftRightAwayPct === "number") {
+      var left = session.closing.leftRightAwayPct;
+      var stayed = 100 - left;
+      var text = stayed + "% stayed talking, " + left + "% left right away";
+      if (session.closing.mixed) text += " (Mixed)";
+      return text;
+    }
     if (session.closing.answer === "Other") return "Other — " + (session.closing.otherText || "");
-    return session.closing.answer;
+    return session.closing.answer || "—";
   }
 
   function buildReport(session) {
@@ -579,7 +605,7 @@
       "End: " + (lastEnd ? formatHMS(lastEnd) : "—"),
       "Duration: " + (totals.totalSeconds ? formatSeconds(totals.totalSeconds) : "—"),
       "",
-      "After the closing announcement: " + closingAnswerText(session)
+      "After the session closed: " + closingAnswerText(session)
     ];
     if (session.closing && session.closing.comment) lines.push("Comment: " + session.closing.comment);
     lines.push("", "TOTALS");
@@ -658,13 +684,32 @@
 
   function normalizeClosing(raw) {
     if (!raw || typeof raw !== "object") return null;
+    var comment = String(raw.comment || "").trim();
+    var pctText = raw.leftRightAwayPct == null ? "" : String(raw.leftRightAwayPct).trim();
+    if (pctText !== "") {
+      var pct = Number(pctText);
+      if (isFinite(pct)) {
+        pct = Math.round(pct);
+        if (pct >= 0 && pct <= 100) {
+          return {
+            leftRightAwayPct: pct,
+            mixed: !!raw.mixed,
+            answer: "",
+            otherText: "",
+            comment: comment
+          };
+        }
+      }
+    }
     if (CLOSING_OPTIONS.indexOf(raw.answer) === -1) return null;
     var otherText = String(raw.otherText || "").trim();
     if (raw.answer === "Other" && !otherText) return null;
     return {
+      leftRightAwayPct: null,
+      mixed: false,
       answer: raw.answer,
       otherText: raw.answer === "Other" ? otherText : "",
-      comment: String(raw.comment || "").trim()
+      comment: comment
     };
   }
 
@@ -1104,21 +1149,24 @@
     toast("Last tap undone");
   }
 
-  function selectedClosing() {
-    var picked = document.querySelector('input[name="closing"]:checked');
-    return picked ? picked.value : "";
+  function paintCloseSlider(sliderId, stayedId, leftId, value) {
+    var y = snapLeftPct(value);
+    var slider = $(sliderId);
+    slider.value = String(y);
+    slider.style.setProperty("--split", y + "%");
+    if (slider.parentElement) slider.parentElement.style.setProperty("--split", y + "%");
+    $(stayedId).textContent = (100 - y) + "% stayed talking";
+    $(leftId).textContent = y + "% left right away";
+    return y;
   }
 
-  function closingValid() {
-    var answer = selectedClosing();
-    if (!answer) return false;
-    if (answer === "Other" && !$("closingOther").value.trim()) return false;
-    return true;
+  function setMixedChip(buttonId, hintId, on) {
+    $(buttonId).setAttribute("aria-pressed", on ? "true" : "false");
+    if ($(hintId)) $(hintId).classList.toggle("hidden", !on);
   }
 
-  function refreshEndForm() {
-    $("closingOtherWrap").classList.toggle("hidden", selectedClosing() !== "Other");
-    $("endConfirmBtn").disabled = !closingValid();
+  function mixedOn(buttonId) {
+    return $(buttonId).getAttribute("aria-pressed") === "true";
   }
 
   function openEnd() {
@@ -1126,11 +1174,10 @@
     if (!session || session.status !== "live" || !session.segments.length) return;
     captureRunningFields();
     save();
-    var radios = document.querySelectorAll('input[name="closing"]');
-    for (var i = 0; i < radios.length; i++) radios[i].checked = false;
-    $("closingOther").value = "";
+    paintCloseSlider("closeSlider", "closeStayed", "closeLeft", 50);
+    setMixedChip("closeMixed", "closeMixedHint", false);
     $("closingComment").value = "";
-    refreshEndForm();
+    $("closeParticipants").value = session.estimatedParticipants == null ? "" : String(session.estimatedParticipants);
     openModal("endModal");
   }
 
@@ -1206,20 +1253,25 @@
     render();
   }
 
-  function finalizeSession() {
-    if (!closingValid()) return;
+  function finalizeSession(storeClose) {
     var session = currentSession();
     if (!session || session.status !== "live" || !session.segments.length) return;
     captureRunningFields();
     var when = new Date();
     var running = runningSegment(session);
     if (running) running.end = when.toISOString();
-    var answer = selectedClosing();
-    session.closing = {
-      answer: answer,
-      otherText: answer === "Other" ? $("closingOther").value.trim() : "",
-      comment: $("closingComment").value.trim()
-    };
+    if (storeClose) {
+      session.estimatedParticipants = parseParticipants($("closeParticipants").value);
+      session.closing = {
+        leftRightAwayPct: paintCloseSlider("closeSlider", "closeStayed", "closeLeft", $("closeSlider").value),
+        mixed: mixedOn("closeMixed"),
+        answer: "",
+        otherText: "",
+        comment: $("closingComment").value.trim()
+      };
+    } else {
+      session.closing = null;
+    }
     session.status = "ended";
     session.endedAt = when.toISOString();
     session.updatedAt = session.endedAt;
@@ -1454,6 +1506,14 @@
     $("setupEditPlanned").value = session.plannedStart || "";
     $("setupEditObserver").value = session.observer || "";
     $("setupEditParticipants").value = session.estimatedParticipants == null ? "" : String(session.estimatedParticipants);
+    var closing = session.closing;
+    var hasPct = !!(closing && typeof closing.leftRightAwayPct === "number");
+    paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", hasPct ? closing.leftRightAwayPct : 50);
+    setMixedChip("setupEditCloseMixed", "setupEditCloseHint", hasPct && !!closing.mixed);
+    var legacy = closing && !hasPct && closing.answer ? "Saved answer: " + closingAnswerText(session) + ". Move the slider or Mixed to replace it." : "";
+    $("setupEditLegacy").textContent = legacy;
+    $("setupEditLegacy").classList.toggle("hidden", !legacy);
+    setupEditCloseTouched = false;
     $("setupEditError").textContent = "";
     openModal("setupEditModal");
   }
@@ -1485,6 +1545,17 @@
     session.plannedStart = planned;
     session.observer = observer;
     session.estimatedParticipants = parseParticipants($("setupEditParticipants").value);
+    var hasPct = !!(session.closing && typeof session.closing.leftRightAwayPct === "number");
+    if (hasPct || setupEditCloseTouched) {
+      var keptComment = session.closing && session.closing.comment ? session.closing.comment : "";
+      session.closing = {
+        leftRightAwayPct: paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", $("setupEditCloseSlider").value),
+        mixed: mixedOn("setupEditCloseMixed"),
+        answer: "",
+        otherText: "",
+        comment: keptComment
+      };
+    }
     session.updatedAt = new Date().toISOString();
     session.dirtyExport = true;
     save();
@@ -1694,7 +1765,7 @@
       '<p class="avg-line" data-group-avg="' + escapeHtml(avg == null ? "" : avg) + '">Average group size: ' +
       escapeHtml(avg == null ? "—" : avg) + "</p>" +
       (totals.plenaryCount ? '<p class="avg-line">Plenary (whole room): ' + totals.plenaryCount + "</p>" : "") +
-      '<p class="closing-line"><strong>After the closing announcement</strong>' +
+      '<p class="closing-line"><strong>After the session closed</strong>' +
       escapeHtml(closingAnswerText(session)) + comment + "</p>";
   }
 
@@ -2077,11 +2148,23 @@
       if (ev.target === $("noteModal")) skipNoteSheet();
     });
 
-    var radios = document.querySelectorAll('input[name="closing"]');
-    for (var i = 0; i < radios.length; i++) radios[i].addEventListener("change", refreshEndForm);
-    $("closingOther").addEventListener("input", refreshEndForm);
+    $("closeSlider").addEventListener("input", function () {
+      paintCloseSlider("closeSlider", "closeStayed", "closeLeft", $("closeSlider").value);
+    });
+    $("closeMixed").addEventListener("click", function () {
+      setMixedChip("closeMixed", "closeMixedHint", !mixedOn("closeMixed"));
+    });
+    $("setupEditCloseSlider").addEventListener("input", function () {
+      setupEditCloseTouched = true;
+      paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", $("setupEditCloseSlider").value);
+    });
+    $("setupEditCloseMixed").addEventListener("click", function () {
+      setupEditCloseTouched = true;
+      setMixedChip("setupEditCloseMixed", "setupEditCloseHint", !mixedOn("setupEditCloseMixed"));
+    });
     $("endCancel").addEventListener("click", function () { closeModal("endModal"); });
-    $("endConfirmBtn").addEventListener("click", finalizeSession);
+    $("endSkip").addEventListener("click", function () { finalizeSession(false); });
+    $("endSave").addEventListener("click", function () { finalizeSession(true); });
     $("endModal").addEventListener("click", function (ev) {
       if (ev.target === $("endModal")) closeModal("endModal");
     });

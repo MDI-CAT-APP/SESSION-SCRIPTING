@@ -28,16 +28,11 @@ The log is saved on the phone as you go. Reloading the page does not clear it.
 
 ## End a session
 
-**End session** is the bar at the bottom of the timing screen. The session is not saved as finished until you answer:
+**End session** is the bar at the bottom of the timing screen. The sheet asks **After the session closed**.
 
-**What happened after the speaker's closing announcement?**
+A slider runs from 0 to 100 in steps of 10, starting at 50. The value is the share who left right away. The left end is everyone stayed talking, and the right end is everyone left right away. The readout shows the stayed share in green and the left-right-away share in red. **Mixed** is a chip. When it is on, a comment is encouraged and still optional. **Number of participants** is filled in from the estimate and, if you save, replaces that estimate.
 
-- People left right away
-- People stayed talking
-- Mixed
-- Other (a short description is required)
-
-A comment is optional.
+**Save** stores the slider, Mixed, the comment, and the participant count, then ends the session. **Skip** ends the session and stores none of that. **Cancel** leaves the session running.
 
 When you confirm, the running activity ends and the session is archived on the phone. The app then writes two files:
 
@@ -59,7 +54,7 @@ The report lists every activity and these totals, with the share of the session.
 - Closing remarks
 - Other (including Drawing)
 
-It also includes the average group size (only activities that have one) and the closing answer.
+It also includes the average group size (only activities that have one) and what happened after the session closed. An older session that still has a written answer shows that answer. A skipped answer is shown as —.
 
 ## Email to Maarten
 
@@ -85,7 +80,9 @@ Every observer's CSV uses the same header, so files from several rooms can be st
 | --- | --- |
 | session | Session title |
 | observer | Observer name |
-| estimated_participants | Optional whole number from setup. The same value is repeated on every row of that session |
+| estimated_participants | Optional whole number from setup, corrected from Number of participants when the session is saved. The same value is repeated on every row of that session |
+| left_right_away_pct | Share who left right away, 0–100. Repeated on every row. Blank when the question was skipped or the session still has an older written answer |
+| closing_mixed | `yes` when Mixed was on, otherwise blank |
 | room_name | Room name from setup. Repeated on every row of that session |
 | room_speakers | Speaker names, separated by `; ` |
 | segment_type | Introduction, Presentation, Conversations (CAT), Participant question, Q&A, Participants feedback, Survey, Closing remarks, or Other activity. Older files may say Conversation for CAT and Feedback for Participants feedback. A former Drawing line is Other activity, with Drawing in the note |
@@ -118,9 +115,9 @@ The summary is one sheet with a `section` column:
 
 - **segment_type** — each activity across all files, including Participants feedback and Closing remarks: count, total seconds, average seconds, share of all recorded time, average group size, and how many lines were plenary
 - **bucket** — the same roll-up the phone report uses (presentation includes introduction, Participants feedback is its own total, Q&A includes participant questions)
-- **session** — one row per exported session: total time, average group size, room name, and the estimated number of participants
+- **session** — one row per exported session: total time, average group size, room name, the estimated number of participants, and the average left-right-away and stayed-talking shares when the CSV has them
 - **session_segment** — each activity inside one session, with that session's share of time
-- **total** — everything added together
+- **total** — everything added together, including the average of those shares across sessions that recorded one
 
 `share_of_time_percent` is a number such as `46.7`. Within each section the shares are rounded to one decimal and adjusted so they add up to 100.
 

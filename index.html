@@ -270,27 +270,39 @@
       <div class="modal-top">
         <div>
           <h2 id="endTitle">End session</h2>
-          <p class="required-pill">Required</p>
         </div>
         <button type="button" class="btn btn-ghost" id="endCancel">Cancel</button>
       </div>
-      <p class="question" id="endQuestion">What happened after the speaker's closing announcement?</p>
-      <div class="choices" role="radiogroup" aria-labelledby="endQuestion">
-        <label class="choice"><input type="radio" name="closing" value="People left right away"> <span>People left right away</span></label>
-        <label class="choice"><input type="radio" name="closing" value="People stayed talking"> <span>People stayed talking</span></label>
-        <label class="choice"><input type="radio" name="closing" value="Mixed"> <span>Mixed</span></label>
-        <label class="choice"><input type="radio" name="closing" value="Other"> <span>Other</span></label>
+      <p class="question" id="endQuestion">After the session closed</p>
+      <div class="close-block">
+        <div class="close-track">
+          <input type="range" class="close-range" id="closeSlider" min="0" max="100" step="10" value="50" aria-labelledby="endQuestion" aria-describedby="closeReadout">
+        </div>
+        <div class="close-ends">
+          <span>Stayed talking</span>
+          <span>Left right away</span>
+        </div>
+        <p class="close-readout" id="closeReadout">
+          <span class="stayed" id="closeStayed">50% stayed talking</span>
+          <span class="left" id="closeLeft">50% left right away</span>
+        </p>
+        <div class="chip-row">
+          <button type="button" class="chip" id="closeMixed" aria-pressed="false">Mixed</button>
+        </div>
       </div>
-      <div class="field hidden" id="closingOtherWrap">
-        <label for="closingOther">Describe what happened</label>
-        <textarea id="closingOther" rows="2" placeholder="What people did after the closing announcement"></textarea>
+      <div class="field">
+        <label for="closeParticipants">Number of participants</label>
+        <input type="number" id="closeParticipants" inputmode="numeric" min="0" max="99999" step="1" placeholder="e.g. 80">
       </div>
       <div class="field">
         <label for="closingComment">Comment <span class="opt">(optional)</span></label>
+        <p class="hint hidden" id="closeMixedHint">A comment helps explain the mix. It stays optional.</p>
         <textarea id="closingComment" rows="2" placeholder="Anything else the coordinator should know"></textarea>
       </div>
-      <p class="hint" id="endHint">Choose an answer to save this session. It cannot be saved without one.</p>
-      <button type="button" class="btn btn-primary btn-block" id="endConfirmBtn" disabled>End session and save</button>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="endSkip">Skip</button>
+        <button type="button" class="btn btn-primary" id="endSave">Save</button>
+      </div>
     </div>
   </div>
 
@@ -403,8 +415,27 @@
         <input type="text" id="setupEditObserver" autocomplete="name" enterkeyhint="next" placeholder="Your name">
       </div>
       <div class="field">
-        <label for="setupEditParticipants">Estimated nr of participants</label>
+        <label for="setupEditParticipants">Number of participants</label>
         <input type="number" id="setupEditParticipants" inputmode="numeric" min="0" max="99999" step="1" enterkeyhint="done" placeholder="e.g. 80">
+      </div>
+      <div class="field">
+        <p class="question" id="setupEditCloseLabel">After the session closed</p>
+        <p class="hint hidden" id="setupEditLegacy"></p>
+        <div class="close-track">
+          <input type="range" class="close-range" id="setupEditCloseSlider" min="0" max="100" step="10" value="50" aria-labelledby="setupEditCloseLabel" aria-describedby="setupEditCloseReadout">
+        </div>
+        <div class="close-ends">
+          <span>Stayed talking</span>
+          <span>Left right away</span>
+        </div>
+        <p class="close-readout" id="setupEditCloseReadout">
+          <span class="stayed" id="setupEditCloseStayed">50% stayed talking</span>
+          <span class="left" id="setupEditCloseLeft">50% left right away</span>
+        </p>
+        <div class="chip-row">
+          <button type="button" class="chip" id="setupEditCloseMixed" aria-pressed="false">Mixed</button>
+        </div>
+        <p class="hint hidden" id="setupEditCloseHint">A comment helps explain the mix. It stays optional.</p>
       </div>
       <p class="form-error" id="setupEditError" role="alert"></p>
       <button type="button" class="btn btn-primary btn-block" id="setupEditSave">Save</button>

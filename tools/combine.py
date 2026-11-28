@@ -27,6 +27,8 @@ COLUMNS = [
     "session",
     "observer",
     "estimated_participants",
+    "average_left_right_away_pct",
+    "average_stayed_talking_pct",
     "room_name",
     "room_speakers",
     "source_file",
@@ -223,6 +225,28 @@ def room_name_from_rows(rows: list[dict[str, str]]) -> str:
     return ""
 
 
+def format_pct(value: float | None) -> str:
+    if value is None:
+        return ""
+    text = f"{value:.1f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def left_pct_from_rows(rows: list[dict[str, str]]) -> float | None:
+    """One left-right-away percent for the session. Missing on older CSVs."""
+    for row in rows:
+        raw = (row.get("left_right_away_pct") or "").strip()
+        if not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        if 0 <= value <= 100:
+            return value
+    return None
+
+
 def participants_from_rows(rows: list[dict[str, str]]) -> str:
     for row in rows:
         raw = (row.get("estimated_participants") or "").strip()
@@ -306,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
                     "observer": observer,
                     "room": room,
                     "participants": participants_from_rows(group_rows),
+                    "left_pct": left_pct_from_rows(group_rows),
                     "room_name": room_name_from_rows(group_rows),
                     "source": path.name,
                     "rows": group_rows,
@@ -323,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     grand_seconds = 0
     grand_groups: list[int] = []
     grand_plenary = 0
+    left_pcts: list[float] = []
     session_stats = []
 
     for session in sessions:
@@ -349,12 +375,16 @@ def main(argv: list[str] | None = None) -> int:
                 plenary_count += 1
                 grand_plenary += 1
         grand_seconds += total
+        left_pct = session.get("left_pct")
+        if isinstance(left_pct, (int, float)):
+            left_pcts.append(float(left_pct))
         session_stats.append(
             {
                 "title": session["title"],
                 "observer": session["observer"],
                 "room": session["room"],
                 "participants": session["participants"],
+                "left_pct": left_pct if isinstance(left_pct, (int, float)) else None,
                 "room_name": session.get("room_name", ""),
                 "source": session["source"],
                 "total": total,
@@ -419,6 +449,10 @@ def main(argv: list[str] | None = None) -> int:
             observer=session["observer"],
             room_speakers=session["room"],
             estimated_participants=session["participants"],
+            average_left_right_away_pct=format_pct(session["left_pct"] if isinstance(session.get("left_pct"), (int, float)) else None),
+            average_stayed_talking_pct=format_pct(
+                None if not isinstance(session.get("left_pct"), (int, float)) else 100 - float(session["left_pct"])
+            ),
             room_name=session.get("room_name", ""),
             source_file=session["source"],
             count=session["count"],
@@ -446,8 +480,11 @@ def main(argv: list[str] | None = None) -> int:
                 session_total_seconds=session["total"],
             )
 
+    overall_left = (sum(left_pcts) / len(left_pcts)) if left_pcts else None
     add(
         "total",
+        average_left_right_away_pct=format_pct(overall_left),
+        average_stayed_talking_pct=format_pct(None if overall_left is None else 100 - overall_left),
         count=sum(bucket.count for bucket in overall.values()),
         total_duration_seconds=grand_seconds,
         average_duration_seconds=average_seconds(
