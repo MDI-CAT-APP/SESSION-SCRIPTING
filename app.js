@@ -819,6 +819,16 @@
     sheet.style.maxHeight = height + "px";
     var obscured = window.innerHeight - vv.offsetTop - vv.height;
     sheet.style.marginBottom = obscured > 1 ? Math.round(obscured) + "px" : "0px";
+    revealNoteComposer();
+  }
+
+  function revealNoteComposer() {
+    var sheet = noteSheetEl();
+    var actions = $("noteModal").querySelector(".note-actions");
+    if (!sheet || !actions || $("noteModal").classList.contains("hidden")) return;
+    var sheetRect = sheet.getBoundingClientRect();
+    var overflow = actions.getBoundingClientRect().bottom - (sheetRect.bottom - 6);
+    if (overflow > 1) sheet.scrollTop += overflow;
   }
 
   function watchNoteViewport(on) {
@@ -1048,6 +1058,7 @@
   function openNoteSheet(seg) {
     noteSegmentId = seg.id;
     $("noteTitle").textContent = activityLabel(seg.type);
+    $("noteActivity").textContent = "Activity: " + activityLabel(seg.type);
     $("noteText").value = seg.note || "";
     var conversation = seg.type === "Conversation";
     $("noteGroupWrap").classList.toggle("hidden", !conversation);
@@ -1993,6 +2004,9 @@
     $("otherCancel").addEventListener("click", cancelOther);
     $("noteSkip").addEventListener("click", skipNoteSheet);
     $("noteSave").addEventListener("click", saveNoteSheet);
+    $("noteText").addEventListener("focus", function () {
+      setTimeout(revealNoteComposer, 60);
+    });
     bindChipRow("noteChips");
     bindChipRow("editChips");
     $("otherModal").addEventListener("click", function (ev) {
