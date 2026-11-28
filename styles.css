@@ -957,16 +957,6 @@ body[data-view="live"] .live-footer { display: block; }
 
 .close-block { margin-bottom: 12px; }
 
-.close-ends {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 4px;
-  color: var(--ink-soft);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
 .close-readout {
   display: flex;
   justify-content: space-between;

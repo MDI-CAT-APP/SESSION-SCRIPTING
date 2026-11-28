@@ -30,9 +30,9 @@ The log is saved on the phone as you go. Reloading the page does not clear it.
 
 **End session** is the bar at the bottom of the timing screen. The sheet asks **After the session closed**.
 
-A slider runs from 0 to 100 in steps of 10, starting at 50. The thumb is the share who stayed talking: green fills from the left up to the thumb, and the red remainder is who left right away. The left end is everyone left right away, and the right end is everyone stayed talking. The readout sits above the slider, stayed in green and left-right-away in red. **Mixed** is a chip. When it is on, a comment is encouraged and still optional. **Number of participants** is filled in from the estimate and, if you save, replaces that estimate.
+A slider runs from 0 to 100 in steps of 10, starting at 50. The thumb is the share who stayed talking: green fills from the left up to the thumb, and the red remainder is who left right away. The readout sits above the slider, stayed in green and left-right-away in red. A comment is optional. **Number of participants** is filled in from the estimate and, if you save, replaces that estimate.
 
-**Save** stores the slider, Mixed, the comment, and the participant count, then ends the session. **Skip** ends the session and stores none of that. **Cancel** leaves the session running.
+**Save** stores the slider, the comment, and the participant count, then ends the session. **Skip** ends the session and stores none of that. **Cancel** leaves the session running.
 
 When you confirm, the running activity ends and the session is archived on the phone. The app then writes two files:
 
@@ -82,7 +82,6 @@ Every observer's CSV uses the same header, so files from several rooms can be st
 | observer | Observer name |
 | estimated_participants | Optional whole number from setup, corrected from Number of participants when the session is saved. The same value is repeated on every row of that session |
 | left_right_away_pct | Share who left right away, 0–100. Repeated on every row. Blank when the question was skipped or the session still has an older written answer |
-| closing_mixed | `yes` when Mixed was on, otherwise blank |
 | room_name | Room name from setup. Repeated on every row of that session |
 | room_speakers | Speaker names, separated by `; ` |
 | segment_type | Introduction, Presentation, Conversations (CAT), Participant question, Q&A, Participants feedback, Survey, Closing remarks, or Other activity. Older files may say Conversation for CAT and Feedback for Participants feedback. A former Drawing line is Other activity, with Drawing in the note |

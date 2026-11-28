@@ -43,7 +43,6 @@
     "observer",
     "estimated_participants",
     "left_right_away_pct",
-    "closing_mixed",
     "room_name",
     "room_speakers",
     "segment_type",
@@ -526,8 +525,7 @@
         csvCell(session.title || ""),
         csvCell(session.observer || ""),
         session.estimatedParticipants == null ? "" : String(session.estimatedParticipants),
-        closingCsv(session).pct,
-        closingCsv(session).mixed,
+        closingCsv(session),
         csvCell(session.roomName || ""),
         csvCell(room),
         csvCell(activityLabel(seg.type)),
@@ -561,8 +559,8 @@
 
   function closingCsv(session) {
     var closing = session && session.closing;
-    if (!closing || typeof closing.leftRightAwayPct !== "number") return { pct: "", mixed: "" };
-    return { pct: String(closing.leftRightAwayPct), mixed: closing.mixed ? "yes" : "" };
+    if (!closing || typeof closing.leftRightAwayPct !== "number") return "";
+    return String(closing.leftRightAwayPct);
   }
 
   function closingAnswerText(session) {
@@ -570,9 +568,7 @@
     if (typeof session.closing.leftRightAwayPct === "number") {
       var left = session.closing.leftRightAwayPct;
       var stayed = 100 - left;
-      var text = stayed + "% stayed talking, " + left + "% left right away";
-      if (session.closing.mixed) text += " (Mixed)";
-      return text;
+      return stayed + "% stayed talking, " + left + "% left right away";
     }
     if (session.closing.answer === "Other") return "Other — " + (session.closing.otherText || "");
     return session.closing.answer || "—";
@@ -693,7 +689,6 @@
         if (pct >= 0 && pct <= 100) {
           return {
             leftRightAwayPct: pct,
-            mixed: !!raw.mixed,
             answer: "",
             otherText: "",
             comment: comment
@@ -706,7 +701,6 @@
     if (raw.answer === "Other" && !otherText) return null;
     return {
       leftRightAwayPct: null,
-      mixed: false,
       answer: raw.answer,
       otherText: raw.answer === "Other" ? otherText : "",
       comment: comment
@@ -1161,22 +1155,12 @@
     return left;
   }
 
-  function setMixedChip(buttonId, hintId, on) {
-    $(buttonId).setAttribute("aria-pressed", on ? "true" : "false");
-    if ($(hintId)) $(hintId).classList.toggle("hidden", !on);
-  }
-
-  function mixedOn(buttonId) {
-    return $(buttonId).getAttribute("aria-pressed") === "true";
-  }
-
   function openEnd() {
     var session = currentSession();
     if (!session || session.status !== "live" || !session.segments.length) return;
     captureRunningFields();
     save();
     paintCloseSlider("closeSlider", "closeStayed", "closeLeft", 50);
-    setMixedChip("closeMixed", "closeMixedHint", false);
     $("closingComment").value = "";
     $("closeParticipants").value = session.estimatedParticipants == null ? "" : String(session.estimatedParticipants);
     openModal("endModal");
@@ -1265,7 +1249,6 @@
       session.estimatedParticipants = parseParticipants($("closeParticipants").value);
       session.closing = {
         leftRightAwayPct: paintCloseSlider("closeSlider", "closeStayed", "closeLeft", $("closeSlider").value),
-        mixed: mixedOn("closeMixed"),
         answer: "",
         otherText: "",
         comment: $("closingComment").value.trim()
@@ -1510,8 +1493,7 @@
     var closing = session.closing;
     var hasPct = !!(closing && typeof closing.leftRightAwayPct === "number");
     paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", hasPct ? 100 - closing.leftRightAwayPct : 50);
-    setMixedChip("setupEditCloseMixed", "setupEditCloseHint", hasPct && !!closing.mixed);
-    var legacy = closing && !hasPct && closing.answer ? "Saved answer: " + closingAnswerText(session) + ". Move the slider or Mixed to replace it." : "";
+    var legacy = closing && !hasPct && closing.answer ? "Saved answer: " + closingAnswerText(session) + ". Move the slider to replace it." : "";
     $("setupEditLegacy").textContent = legacy;
     $("setupEditLegacy").classList.toggle("hidden", !legacy);
     setupEditCloseTouched = false;
@@ -1551,7 +1533,6 @@
       var keptComment = session.closing && session.closing.comment ? session.closing.comment : "";
       session.closing = {
         leftRightAwayPct: paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", $("setupEditCloseSlider").value),
-        mixed: mixedOn("setupEditCloseMixed"),
         answer: "",
         otherText: "",
         comment: keptComment
@@ -2152,16 +2133,9 @@
     $("closeSlider").addEventListener("input", function () {
       paintCloseSlider("closeSlider", "closeStayed", "closeLeft", $("closeSlider").value);
     });
-    $("closeMixed").addEventListener("click", function () {
-      setMixedChip("closeMixed", "closeMixedHint", !mixedOn("closeMixed"));
-    });
     $("setupEditCloseSlider").addEventListener("input", function () {
       setupEditCloseTouched = true;
       paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", $("setupEditCloseSlider").value);
-    });
-    $("setupEditCloseMixed").addEventListener("click", function () {
-      setupEditCloseTouched = true;
-      setMixedChip("setupEditCloseMixed", "setupEditCloseHint", !mixedOn("setupEditCloseMixed"));
     });
     $("endCancel").addEventListener("click", function () { closeModal("endModal"); });
     $("endSkip").addEventListener("click", function () { finalizeSession(false); });

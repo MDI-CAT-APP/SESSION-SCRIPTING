@@ -282,13 +282,6 @@
         <div class="close-track">
           <input type="range" class="close-range" id="closeSlider" min="0" max="100" step="10" value="50" aria-labelledby="endQuestion" aria-describedby="closeReadout">
         </div>
-        <div class="close-ends">
-          <span>Left right away</span>
-          <span>Stayed talking</span>
-        </div>
-        <div class="chip-row">
-          <button type="button" class="chip" id="closeMixed" aria-pressed="false">Mixed</button>
-        </div>
       </div>
       <div class="field">
         <label for="closeParticipants">Number of participants</label>
@@ -296,7 +289,6 @@
       </div>
       <div class="field">
         <label for="closingComment">Comment <span class="opt">(optional)</span></label>
-        <p class="hint hidden" id="closeMixedHint">A comment helps explain the mix. It stays optional.</p>
         <textarea id="closingComment" rows="2" placeholder="Anything else the coordinator should know"></textarea>
       </div>
       <div class="modal-actions">
@@ -428,14 +420,6 @@
         <div class="close-track">
           <input type="range" class="close-range" id="setupEditCloseSlider" min="0" max="100" step="10" value="50" aria-labelledby="setupEditCloseLabel" aria-describedby="setupEditCloseReadout">
         </div>
-        <div class="close-ends">
-          <span>Left right away</span>
-          <span>Stayed talking</span>
-        </div>
-        <div class="chip-row">
-          <button type="button" class="chip" id="setupEditCloseMixed" aria-pressed="false">Mixed</button>
-        </div>
-        <p class="hint hidden" id="setupEditCloseHint">A comment helps explain the mix. It stays optional.</p>
       </div>
       <p class="form-error" id="setupEditError" role="alert"></p>
       <button type="button" class="btn btn-primary btn-block" id="setupEditSave">Save</button>
