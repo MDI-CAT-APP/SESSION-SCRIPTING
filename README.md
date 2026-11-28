@@ -34,15 +34,12 @@ A slider runs from 0 to 100 in steps of 10, starting at 50. The thumb is the sha
 
 **Save** stores the slider, the comment, and the participant count, then ends the session. **Skip** ends the session and stores none of that. **Cancel** leaves the session running.
 
-When you confirm, the running activity ends and the session is archived on the phone. The app then writes two files:
+When you confirm, the running activity ends and the session is archived on the phone. Ending does not download the files. **Email to Maarten** and **Share** create them:
 
 `YYMMDD_Session-Title_Firstname.txt`
 `YYMMDD_Session-Title_Firstname.csv`
 
 Example: `261128_Opening-Keynote_Maarten.txt`. The first name is the first word of the observer field. If the title is empty the name uses `session`. If the observer field is empty, that part is left off.
-
-- **Android Chrome** saves both files to Downloads.
-- **iPhone** cannot save a file silently. The share sheet opens so you can choose **Save to Files**. Save both the TXT and the CSV, then email them.
 
 The report lists every activity and these totals, with the share of the session. A category is left out when its time is 0 seconds. The Past sessions chart does the same:
 
@@ -62,7 +59,7 @@ It also includes the average group size (only activities that have one) and what
 
 If the phone cannot share files, Mail opens with the text report in the body. Attach the CSV yourself. The app names the file to attach.
 
-Share and New session sit on the same card as Email to Maarten. Ending a session still saves the TXT and CSV to Downloads.
+Share and New session sit on the same card as Email to Maarten. Ending a session keeps it on the phone and shows those buttons. The files are created when you email or share.
 
 ## Past sessions
 

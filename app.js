@@ -1179,93 +1179,24 @@
     openModal("endModal");
   }
 
-  function isIOS() {
-    var ua = navigator.userAgent || "";
-    if (/iPad|iPhone|iPod/.test(ua)) return true;
-    return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-  }
-
   function canShareFiles(files) {
     if (!files || !files[0] || !files[1] || !navigator.share || !navigator.canShare) return false;
     try { return navigator.canShare({ files: files }); } catch (e) { return false; }
   }
 
-  function downloadText(name, text, mime, bom) {
-    return downloadBoth([{ name: name, text: text, mime: mime, bom: bom }]);
-  }
-
-  function clickDownload(job) {
-    var blob = new Blob([(job.bom ? "\ufeff" : "") + job.text], { type: job.mime + ";charset=utf-8" });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement("a");
-    link.href = url;
-    link.download = job.name;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(function () {
-      link.remove();
-      URL.revokeObjectURL(url);
-    }, 4000);
-  }
-
-  function downloadBoth(jobs) {
-    return new Promise(function (resolve) {
-      var index = 0;
-      function next() {
-        if (index >= jobs.length) {
-          resolve();
-          return;
-        }
-        clickDownload(jobs[index]);
-        index += 1;
-        if (index >= jobs.length) {
-          resolve();
-          return;
-        }
-        setTimeout(next, 1000);
-      }
-      next();
-    });
-  }
-
   function autoSaveFiles(session) {
     var files = buildFiles(session);
-    var ios = isIOS();
     session.lastFiles = {
       txtName: files.txtName,
       csvName: files.csvName,
-      method: ios ? "share" : "download",
+      method: "local",
       savedAt: new Date().toISOString()
     };
     session.dirtyExport = false;
     exportNote = { text: "", error: false };
     save();
     render();
-    if (ios) {
-      var packed = [files.txtFile, files.csvFile];
-      if (canShareFiles(packed)) {
-        navigator.share({
-          files: packed,
-          title: "Session Script — " + COORDINATOR,
-          text: "Save both files to Files, then email them to " + COORDINATOR + ".\n\n" + files.txtName + "\n" + files.csvName
-        }).then(function () {
-          toast("Files saved", 3000);
-        }).catch(function (err) {
-          if (err && err.name === "AbortError") return;
-          setStatus("The share sheet did not open. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
-        });
-      } else {
-        setStatus("This browser cannot open the share sheet. Use Email to Maarten or Share, then send both files to " + COORDINATOR + ".", true);
-      }
-      return;
-    }
-    downloadBoth([
-      { name: files.txtName, text: files.txt, mime: "text/plain", bom: false },
-      { name: files.csvName, text: files.csv, mime: "text/csv", bom: true }
-    ]).then(function () {
-      toast("Files saved", 3000);
-    });
+    toast("Files saved", 3000);
   }
 
   function finalizeSession(storeClose) {
@@ -1422,16 +1353,6 @@
       return;
     }
     window.location.href = url;
-  }
-
-  function saveSingle(kind) {
-    var session = currentSession();
-    if (!session) return;
-    var files = buildFiles(session);
-    if (kind === "csv") downloadText(files.csvName, files.csv, "text/csv", true);
-    else downloadText(files.txtName, files.txt, "text/plain", false);
-    clearDirty(session);
-    setStatus("Saved “" + (kind === "csv" ? files.csvName : files.txtName) + "”.");
   }
 
   function sendToServer() {
