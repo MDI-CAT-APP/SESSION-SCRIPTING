@@ -49,7 +49,7 @@ Example: `261127 opening-keynote amina-yusuf.txt`.
 - **Android Chrome** saves both files to Downloads.
 - **iPhone** cannot save a file silently. The share sheet opens so you can choose **Save to Files**. Save both the TXT and the CSV, then email them.
 
-The report lists every segment and these totals, with the share of the session:
+The report lists every segment and these totals, with the share of the session. A category is left out when its time is 0 seconds. The Past sessions chart does the same:
 
 - Presentation (including introduction)
 - Conversations About the Topic (CAT)

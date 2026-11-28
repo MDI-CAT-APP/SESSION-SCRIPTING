@@ -457,6 +457,19 @@
     };
   }
 
+  function shownBuckets(totals) {
+    var rows = totals.buckets.filter(function (bucket) { return bucket.seconds > 0; });
+    var tenths = shareTenths(rows.map(function (bucket) { return bucket.seconds; }), totals.totalSeconds);
+    return rows.map(function (bucket, index) {
+      return {
+        id: bucket.id,
+        label: bucket.label,
+        seconds: bucket.seconds,
+        tenths: tenths[index]
+      };
+    });
+  }
+
   function formatAvg(value) {
     if (value == null || !isFinite(value)) return null;
     var rounded = Math.round(value * 100) / 100;
@@ -568,9 +581,8 @@
     ];
     if (session.closing && session.closing.comment) lines.push("Comment: " + session.closing.comment);
     lines.push("", "TOTALS");
-    totals.buckets.forEach(function (bucket) {
-      var shown = bucket.seconds === 0 ? "0 min" : formatSeconds(bucket.seconds);
-      lines.push(bucket.label + ": " + shown + " (" + (bucket.tenths / 10).toFixed(1) + "%)");
+    shownBuckets(totals).forEach(function (bucket) {
+      lines.push(bucket.label + ": " + formatSeconds(bucket.seconds) + " (" + (bucket.tenths / 10).toFixed(1) + "%)");
     });
     lines.push("Average group size: " + (formatAvg(totals.averageGroup) || "—"));
     lines.push("", "SEGMENTS");
@@ -1566,8 +1578,8 @@
 
   function totalsHtml(session) {
     var totals = computeTotals(session);
-    var rows = totals.buckets.map(function (bucket) {
-      var shown = bucket.seconds === 0 ? "0 min" : formatSeconds(bucket.seconds);
+    var rows = shownBuckets(totals).map(function (bucket) {
+      var shown = formatSeconds(bucket.seconds);
       var pct = (bucket.tenths / 10).toFixed(1);
       return '<div class="total-row" data-bucket="' + bucket.id + '" data-seconds="' + bucket.seconds + '" data-percent="' + pct + '">' +
         '<div class="top"><strong>' + escapeHtml(bucket.label) + '</strong><span class="nums">' +
