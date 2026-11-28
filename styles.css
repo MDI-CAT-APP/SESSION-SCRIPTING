@@ -530,6 +530,11 @@ input:focus, textarea:focus, select:focus {
   stroke-linejoin: round;
 }
 
+.activity-grid button svg.icon-people {
+  width: 32px;
+  height: 16px;
+}
+
 .activity-grid button:active,
 .activity-grid button[aria-pressed="true"] {
   background: var(--teal);

@@ -12,7 +12,7 @@ Open `index.html` on the phone, or run the optional server below and open that a
 2. Tap **Next**. That opens the activity screen and does not start the clock.
 3. Tap an activity to start timing. That first tap is the actual start, and the first segment begins then. Each later tap ends the segment that was running and starts the next one.
 
-Activities: Introduction, Presentation, Conversations About the Topic (CAT), Participant question, Q&A, Feedback, Survey, Closing remarks, and Other activity. Older logs stored this activity as Conversation; the phone still keeps that key and shows the CAT name. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
+Activities: Introduction, Presentation, Conversations About the Topic (CAT), Participant question, Q&A, Participant feedback, Survey, Closing remarks, and Other activity. Older logs stored CAT as Conversation and Participant feedback as Feedback; the phone still keeps those keys and shows the current names. Other activity asks what is happening, and offers Drawing as a quick pick, so the line reads Other activity: Drawing. Older logs that used a separate Drawing category are kept as that same line.
 
 The on-screen log is a dense list: one 13px line per activity, name and length only. A running line shows the live length. A note or group size is shortened on that same line. The full text, group size, and start time are in Edit. Start and end times stay in the TXT and CSV files.
 
@@ -53,7 +53,7 @@ The report lists every segment and these totals, with the share of the session:
 
 - Presentation (including introduction)
 - Conversations About the Topic (CAT)
-- Feedback
+- Participant feedback
 - Q&A (including participant questions)
 - Survey
 - Closing remarks
@@ -88,7 +88,7 @@ Every observer's CSV uses the same header, so files from several rooms can be st
 | estimated_participants | Optional whole number from setup. The same value is repeated on every row of that session |
 | room_name | Room name from setup. Repeated on every row of that session |
 | room_speakers | Speaker names, separated by `; ` |
-| segment_type | Introduction, Presentation, Conversations About the Topic (CAT), Participant question, Q&A, Feedback, Survey, Closing remarks, or Other activity. Older files may say Conversation for CAT. A former Drawing line is Other activity, with Drawing in the note |
+| segment_type | Introduction, Presentation, Conversations About the Topic (CAT), Participant question, Q&A, Participant feedback, Survey, Closing remarks, or Other activity. Older files may say Conversation for CAT and Feedback for Participant feedback. A former Drawing line is Other activity, with Drawing in the note |
 | start | Local start, `YYYY-MM-DD HH:MM:SS` |
 | end | Local end, same format |
 | duration_seconds | Whole seconds |
@@ -116,8 +116,8 @@ Python 3 only. No packages to install.
 
 The summary is one sheet with a `section` column:
 
-- **segment_type** — each activity across all files, including Feedback and Closing remarks: count, total seconds, average seconds, share of all recorded time, average group size, and how many lines were plenary
-- **bucket** — the same roll-up the phone report uses (presentation includes introduction, Feedback is its own total, Q&A includes participant questions)
+- **segment_type** — each activity across all files, including Participant feedback and Closing remarks: count, total seconds, average seconds, share of all recorded time, average group size, and how many lines were plenary
+- **bucket** — the same roll-up the phone report uses (presentation includes introduction, Participant feedback is its own total, Q&A includes participant questions)
 - **session** — one row per exported session: total time, average group size, room name, and the estimated number of participants
 - **session_segment** — each activity inside one session, with that session's share of time
 - **total** — everything added together
