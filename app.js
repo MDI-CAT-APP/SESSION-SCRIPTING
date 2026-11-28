@@ -13,9 +13,9 @@
     "Introduction",
     "Presentation",
     "Conversation",
-    "Feedback",
-    "Q&A",
     "Participant question",
+    "Q&A",
+    "Feedback",
     "Survey",
     "Closing remarks",
     "Other activity"
