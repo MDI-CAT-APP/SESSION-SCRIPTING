@@ -466,6 +466,16 @@ input:focus, textarea:focus, select:focus {
   align-items: flex-start;
   justify-content: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.activity-grid button .activity-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.15;
 }
 
 .activity-grid button svg {

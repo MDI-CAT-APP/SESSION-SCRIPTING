@@ -54,7 +54,7 @@ REQUIRED = {
 SEGMENT_TYPES = [
     "Introduction",
     "Presentation",
-    "Conversation",
+    "Conversations About the Topic (CAT)",
     "Feedback",
     "Q&A",
     "Participant question",
@@ -66,7 +66,7 @@ SEGMENT_TYPES = [
 
 BUCKETS = [
     ("Presentation (incl. introduction)", ["Introduction", "Presentation"]),
-    ("Conversation", ["Conversation"]),
+    ("Conversations About the Topic (CAT)", ["Conversations About the Topic (CAT)", "Conversation"]),
     ("Feedback", ["Feedback"]),
     ("Q&A (incl. participant questions)", ["Q&A", "Participant question"]),
     ("Survey", ["Survey"]),
@@ -79,6 +79,8 @@ def canonical_segment_type(row: dict[str, str]) -> str:
     """Old Drawing rows, and Other activity labelled Drawing, stay readable."""
     name = (row.get("segment_type") or "").strip()
     note = (row.get("note") or "").strip()
+    if name in {"Conversation", "Conversations About the Topic (CAT)"}:
+        return "Conversations About the Topic (CAT)"
     if name == "Drawing" or name == "Other: Drawing":
         return "Other: Drawing"
     if name == "Other activity" and (note == "Drawing" or note.startswith("Drawing - ")):

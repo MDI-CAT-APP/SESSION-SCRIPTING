@@ -23,7 +23,7 @@
 
   var BUCKETS = [
     { id: "presentation", label: "Presentation (incl. introduction)", types: ["Introduction", "Presentation"] },
-    { id: "conversation", label: "Conversation", types: ["Conversation"] },
+    { id: "conversation", label: "Conversations About the Topic (CAT)", types: ["Conversation"] },
     { id: "feedback", label: "Feedback", types: ["Feedback"] },
     { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
     { id: "survey", label: "Survey", types: ["Survey"] },
@@ -60,6 +60,7 @@
     "Question from a participant": "Participant question",
     "Participant question": "Participant question",
     "Conversation": "Conversation",
+    "Conversations About the Topic (CAT)": "Conversation",
     "Feedback": "Feedback",
     "Q&A": "Q&A",
     "Survey": "Survey",
@@ -462,11 +463,16 @@
     return String(rounded);
   }
 
+  function activityLabel(type) {
+    if (type === "Conversation") return "Conversations About the Topic (CAT)";
+    return type || "";
+  }
+
   function segmentLabel(seg) {
     if (seg.type === "Other activity" && (seg.otherLabel || "").trim()) {
       return "Other activity: " + seg.otherLabel.trim();
     }
-    return seg.type;
+    return activityLabel(seg.type);
   }
 
   function exportNoteText(seg) {
@@ -502,7 +508,7 @@
         session.estimatedParticipants == null ? "" : String(session.estimatedParticipants),
         csvCell(session.roomName || ""),
         csvCell(room),
-        csvCell(seg.type),
+        csvCell(activityLabel(seg.type)),
         csvCell(seg.start ? formatStamp(new Date(seg.start)) : ""),
         csvCell(seg.end ? formatStamp(new Date(seg.end)) : ""),
         secs == null ? "" : String(secs),
@@ -604,11 +610,12 @@
 
   function normalizeSegment(raw) {
     if (!raw || typeof raw !== "object" || !raw.start) return null;
-    var legacyDrawing = raw.type === "Drawing";
-    var type = legacyDrawing || ACTIVITY_TYPES.indexOf(raw.type) === -1 ? "Other activity" : raw.type;
+    var storedType = raw.type === "Conversations About the Topic (CAT)" ? "Conversation" : raw.type;
+    var legacyDrawing = storedType === "Drawing";
+    var type = legacyDrawing || ACTIVITY_TYPES.indexOf(storedType) === -1 ? "Other activity" : storedType;
     var otherLabel = (raw.otherLabel || "").trim();
     if (legacyDrawing && !otherLabel) otherLabel = "Drawing";
-    if (type === "Other activity" && raw.type !== "Other activity" && !otherLabel) otherLabel = String(raw.type || "");
+    if (type === "Other activity" && storedType !== "Other activity" && !otherLabel) otherLabel = String(storedType || "");
     var storedSize = parseGroupSize(raw.groupSize);
     var avg = normalizeGroupAvg(raw.groupSizeAvg, storedSize);
     var segment = {
@@ -986,7 +993,7 @@
 
   function openNoteSheet(seg) {
     noteSegmentId = seg.id;
-    $("noteTitle").textContent = seg.type;
+    $("noteTitle").textContent = activityLabel(seg.type);
     $("noteStart").textContent = formatHMS(new Date(seg.start));
     $("noteText").value = seg.note || "";
     var conversation = seg.type === "Conversation";
@@ -1829,7 +1836,7 @@
 
   function fillEditTypes() {
     $("editType").innerHTML = ACTIVITY_TYPES.map(function (type) {
-      return '<option value="' + escapeHtml(type) + '">' + escapeHtml(type) + "</option>";
+      return '<option value="' + escapeHtml(type) + '">' + escapeHtml(activityLabel(type)) + "</option>";
     }).join("");
   }
 
