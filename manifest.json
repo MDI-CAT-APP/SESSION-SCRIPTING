@@ -1,5 +1,5 @@
 {
-  "name": "Live Session Activity Report",
+  "name": "Session Activity Report",
   "short_name": "Activity Report",
   "description": "Time each part of a conference session and export a text report and a spreadsheet.",
   "start_url": "./index.html",
