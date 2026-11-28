@@ -23,7 +23,7 @@
 
   var BUCKETS = [
     { id: "presentation", label: "Presentation (incl. introduction)", types: ["Introduction", "Presentation"] },
-    { id: "conversation", label: "Conversations About the Topic (CAT)", types: ["Conversation"] },
+    { id: "conversation", label: "Conversations (CAT)", types: ["Conversation"] },
     { id: "feedback", label: "Participant feedback", types: ["Feedback"] },
     { id: "qa", label: "Q&A (incl. participant questions)", types: ["Q&A", "Participant question"] },
     { id: "survey", label: "Survey", types: ["Survey"] },
@@ -61,6 +61,7 @@
     "Participant question": "Participant question",
     "Conversation": "Conversation",
     "Conversations About the Topic (CAT)": "Conversation",
+    "Conversations (CAT)": "Conversation",
     "Feedback": "Feedback",
     "Participant feedback": "Feedback",
     "Q&A": "Q&A",
@@ -478,7 +479,7 @@
   }
 
   function activityLabel(type) {
-    if (type === "Conversation") return "Conversations About the Topic (CAT)";
+    if (type === "Conversation") return "Conversations (CAT)";
     if (type === "Feedback") return "Participant feedback";
     return type || "";
   }
@@ -624,7 +625,7 @@
 
   function normalizeSegment(raw) {
     if (!raw || typeof raw !== "object" || !raw.start) return null;
-    var storedType = raw.type === "Conversations About the Topic (CAT)" ? "Conversation" : raw.type === "Participant feedback" ? "Feedback" : raw.type;
+    var storedType = raw.type === "Conversations About the Topic (CAT)" || raw.type === "Conversations (CAT)" ? "Conversation" : raw.type === "Participant feedback" ? "Feedback" : raw.type;
     var legacyDrawing = storedType === "Drawing";
     var type = legacyDrawing || ACTIVITY_TYPES.indexOf(storedType) === -1 ? "Other activity" : storedType;
     var otherLabel = (raw.otherLabel || "").trim();

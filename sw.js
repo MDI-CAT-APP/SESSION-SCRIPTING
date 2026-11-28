@@ -1,5 +1,5 @@
 /* Session Script service worker — offline cache for the static app. */
-const CACHE = "session-script-v33";
+const CACHE = "session-script-v34";
 const ASSETS = [
   "./",
   "./index.html",
