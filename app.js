@@ -1149,15 +1149,16 @@
     toast("Last tap undone");
   }
 
-  function paintCloseSlider(sliderId, stayedId, leftId, value) {
-    var y = snapLeftPct(value);
+  function paintCloseSlider(sliderId, stayedId, leftId, stayedValue) {
+    var stayed = snapLeftPct(stayedValue);
+    var left = 100 - stayed;
     var slider = $(sliderId);
-    slider.value = String(y);
-    slider.style.setProperty("--split", y + "%");
-    if (slider.parentElement) slider.parentElement.style.setProperty("--split", y + "%");
-    $(stayedId).textContent = (100 - y) + "% stayed talking";
-    $(leftId).textContent = y + "% left right away";
-    return y;
+    slider.value = String(stayed);
+    slider.style.setProperty("--split", stayed + "%");
+    if (slider.parentElement) slider.parentElement.style.setProperty("--split", stayed + "%");
+    $(stayedId).textContent = stayed + "% stayed talking";
+    $(leftId).textContent = left + "% left right away";
+    return left;
   }
 
   function setMixedChip(buttonId, hintId, on) {
@@ -1508,7 +1509,7 @@
     $("setupEditParticipants").value = session.estimatedParticipants == null ? "" : String(session.estimatedParticipants);
     var closing = session.closing;
     var hasPct = !!(closing && typeof closing.leftRightAwayPct === "number");
-    paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", hasPct ? closing.leftRightAwayPct : 50);
+    paintCloseSlider("setupEditCloseSlider", "setupEditCloseStayed", "setupEditCloseLeft", hasPct ? 100 - closing.leftRightAwayPct : 50);
     setMixedChip("setupEditCloseMixed", "setupEditCloseHint", hasPct && !!closing.mixed);
     var legacy = closing && !hasPct && closing.answer ? "Saved answer: " + closingAnswerText(session) + ". Move the slider or Mixed to replace it." : "";
     $("setupEditLegacy").textContent = legacy;

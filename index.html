@@ -275,17 +275,17 @@
       </div>
       <p class="question" id="endQuestion">After the session closed</p>
       <div class="close-block">
-        <div class="close-track">
-          <input type="range" class="close-range" id="closeSlider" min="0" max="100" step="10" value="50" aria-labelledby="endQuestion" aria-describedby="closeReadout">
-        </div>
-        <div class="close-ends">
-          <span>Stayed talking</span>
-          <span>Left right away</span>
-        </div>
         <p class="close-readout" id="closeReadout">
           <span class="stayed" id="closeStayed">50% stayed talking</span>
           <span class="left" id="closeLeft">50% left right away</span>
         </p>
+        <div class="close-track">
+          <input type="range" class="close-range" id="closeSlider" min="0" max="100" step="10" value="50" aria-labelledby="endQuestion" aria-describedby="closeReadout">
+        </div>
+        <div class="close-ends">
+          <span>Left right away</span>
+          <span>Stayed talking</span>
+        </div>
         <div class="chip-row">
           <button type="button" class="chip" id="closeMixed" aria-pressed="false">Mixed</button>
         </div>
@@ -421,17 +421,17 @@
       <div class="field">
         <p class="question" id="setupEditCloseLabel">After the session closed</p>
         <p class="hint hidden" id="setupEditLegacy"></p>
-        <div class="close-track">
-          <input type="range" class="close-range" id="setupEditCloseSlider" min="0" max="100" step="10" value="50" aria-labelledby="setupEditCloseLabel" aria-describedby="setupEditCloseReadout">
-        </div>
-        <div class="close-ends">
-          <span>Stayed talking</span>
-          <span>Left right away</span>
-        </div>
         <p class="close-readout" id="setupEditCloseReadout">
           <span class="stayed" id="setupEditCloseStayed">50% stayed talking</span>
           <span class="left" id="setupEditCloseLeft">50% left right away</span>
         </p>
+        <div class="close-track">
+          <input type="range" class="close-range" id="setupEditCloseSlider" min="0" max="100" step="10" value="50" aria-labelledby="setupEditCloseLabel" aria-describedby="setupEditCloseReadout">
+        </div>
+        <div class="close-ends">
+          <span>Left right away</span>
+          <span>Stayed talking</span>
+        </div>
         <div class="chip-row">
           <button type="button" class="chip" id="setupEditCloseMixed" aria-pressed="false">Mixed</button>
         </div>

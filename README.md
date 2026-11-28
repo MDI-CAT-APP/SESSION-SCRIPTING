@@ -30,7 +30,7 @@ The log is saved on the phone as you go. Reloading the page does not clear it.
 
 **End session** is the bar at the bottom of the timing screen. The sheet asks **After the session closed**.
 
-A slider runs from 0 to 100 in steps of 10, starting at 50. The value is the share who left right away. The left end is everyone stayed talking, and the right end is everyone left right away. The readout shows the stayed share in green and the left-right-away share in red. **Mixed** is a chip. When it is on, a comment is encouraged and still optional. **Number of participants** is filled in from the estimate and, if you save, replaces that estimate.
+A slider runs from 0 to 100 in steps of 10, starting at 50. The thumb is the share who stayed talking: green fills from the left up to the thumb, and the red remainder is who left right away. The left end is everyone left right away, and the right end is everyone stayed talking. The readout sits above the slider, stayed in green and left-right-away in red. **Mixed** is a chip. When it is on, a comment is encouraged and still optional. **Number of participants** is filled in from the estimate and, if you save, replaces that estimate.
 
 **Save** stores the slider, Mixed, the comment, and the participant count, then ends the session. **Skip** ends the session and stores none of that. **Cancel** leaves the session running.
 

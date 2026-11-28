@@ -971,7 +971,7 @@ body[data-view="live"] .live-footer { display: block; }
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin: 6px 0 8px;
+  margin: 0 0 2px;
   font-size: 0.95rem;
   font-weight: 750;
 }
