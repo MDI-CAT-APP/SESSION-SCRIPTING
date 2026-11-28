@@ -440,6 +440,18 @@ input:focus, textarea:focus, select:focus {
   margin-bottom: 8px;
 }
 
+.size-choices {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.size-choices .chip {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 0;
+}
+
 .chip {
   appearance: none;
   min-height: 44px;

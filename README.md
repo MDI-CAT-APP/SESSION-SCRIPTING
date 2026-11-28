@@ -22,7 +22,7 @@ A second tap on the same activity within 2 seconds is ignored. **Undo last tap**
 
 **Edit** on a line can change the activity, the note, and the group size. **Delete line** asks you to confirm, then removes that line and keeps the timeline continuous: the previous line extends to the next line’s start. If you delete the line that is still running, the previous line is running again.
 
-Conversations (CAT) has **CAT group size avg estimate**: 2, 3, 4, 5, or 6. Older logs can still carry another number or plenary, and those values stay in the exports. Other activity still has an optional group size.
+Conversations (CAT) has **CAT group size avg estimate**: 2, 3, 4, 5, or 6. Older logs can still carry another number or plenary, and those values stay in the exports. Other activity has an optional **Estimated average group size**: 2, 3, 4, 5, 6, 7, or 8.
 
 The log is saved on the phone as you go. Reloading the page does not clear it.
 

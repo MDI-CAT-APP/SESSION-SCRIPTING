@@ -80,6 +80,7 @@
   var noteSegmentId = null;
   var editingId = null;
   var setupEditCloseTouched = false;
+  var editOtherGroupKept = null;
   var deletingId = null;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -1025,11 +1026,9 @@
 
   function openOther(when) {
     pendingOtherAt = when;
-    $("otherStart").textContent = formatHMS(when);
     $("otherText").value = "";
-    $("otherGroup").value = "";
+    setChips("otherGroupChips", "");
     $("otherSave").disabled = true;
-    $("otherPrompt").classList.remove("hidden");
     markOtherQuick("otherQuick", "");
     openModal("otherModal");
     buzz();
@@ -1048,7 +1047,7 @@
     var when = pendingOtherAt;
     pendingOtherAt = null;
     closeModal("otherModal");
-    var size = parseGroupSize($("otherGroup").value);
+    var size = parseGroupSize(readGroupAvg("otherGroupChips"));
     startSegment(session, "Other activity", when, {
       otherLabel: label,
       groupSize: size,
@@ -1923,7 +1922,10 @@
     $("editType").value = seg.type;
     $("editOther").value = seg.otherLabel || "";
     markOtherQuick("editQuick", seg.otherLabel || "");
-    $("editGroup").value = seg.groupSize == null ? "" : String(seg.groupSize);
+    var otherSize = seg.type === "Other activity" ? seg.groupSize : null;
+    var otherPreset = otherSize != null && otherSize >= 2 && otherSize <= 8 ? String(otherSize) : "";
+    setChips("editGroupChips", otherPreset);
+    editOtherGroupKept = otherPreset || otherSize == null ? null : String(otherSize);
     showGroupAvg("editChips", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
     $("editNote").value = seg.note || "";
     $("editStart").textContent = formatHMS(new Date(seg.start));
@@ -1957,7 +1959,7 @@
     seg.type = type;
     seg.otherLabel = otherLabel;
     if (type === "Conversation") commitGroupAvg(seg, "editChips");
-    else if (type === "Other activity") applyGroupAvg(seg, $("editGroup").value);
+    else if (type === "Other activity") applyGroupAvg(seg, readGroupAvg("editGroupChips") || editOtherGroupKept || "");
     else applyGroupAvg(seg, "");
     seg.note = $("editNote").value.trim();
     if (session.status === "ended") session.dirtyExport = true;
@@ -2115,7 +2117,6 @@
     $("otherText").addEventListener("input", function () {
       var text = $("otherText").value.trim();
       $("otherSave").disabled = !text;
-      $("otherPrompt").classList.toggle("hidden", !!text);
       markOtherQuick("otherQuick", text);
     });
     bindOtherQuick("otherQuick", "otherText", "otherSave");
@@ -2132,6 +2133,9 @@
     });
     bindChipRow("noteChips");
     bindChipRow("editChips");
+    bindChipRow("otherGroupChips");
+    bindChipRow("editGroupChips");
+    $("editGroupChips").addEventListener("click", function () { editOtherGroupKept = null; });
     $("otherModal").addEventListener("click", function (ev) {
       if (ev.target === $("otherModal")) cancelOther();
     });

@@ -213,23 +213,27 @@
     <div class="modal" tabindex="-1">
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="modal-top">
-        <div>
-          <h2 id="otherTitle">Other activity</h2>
-          <p class="stamp">Starts at <strong id="otherStart"></strong></p>
-        </div>
+        <h2 id="otherTitle">Other activity</h2>
         <button type="button" class="btn btn-ghost" id="otherCancel">Cancel</button>
       </div>
       <div class="field">
         <label for="otherText">Note <span class="req">Required</span></label>
-        <p class="hint" id="otherPrompt">Describe what is happening</p>
         <div class="chip-row" id="otherQuick">
           <button type="button" class="chip" data-other-quick="Drawing">Drawing</button>
         </div>
-        <textarea id="otherText" rows="2" placeholder="Describe what is happening" data-autofocus required></textarea>
+        <textarea id="otherText" rows="2" placeholder="Anything worth remembering" data-autofocus required></textarea>
       </div>
       <div class="field">
-        <label for="otherGroup">Group size <span class="opt">(optional)</span></label>
-        <input type="number" id="otherGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
+        <label id="otherGroupLabel">Estimated average group size</label>
+        <div class="chip-row size-choices" id="otherGroupChips" role="radiogroup" aria-labelledby="otherGroupLabel">
+          <button type="button" class="chip" data-chip="2">2</button>
+          <button type="button" class="chip" data-chip="3">3</button>
+          <button type="button" class="chip" data-chip="4">4</button>
+          <button type="button" class="chip" data-chip="5">5</button>
+          <button type="button" class="chip" data-chip="6">6</button>
+          <button type="button" class="chip" data-chip="7">7</button>
+          <button type="button" class="chip" data-chip="8">8</button>
+        </div>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="otherSave" disabled>Save details</button>
     </div>
@@ -318,8 +322,16 @@
         <textarea id="editOther" rows="2"></textarea>
       </div>
       <div class="field hidden" id="editGroupWrap">
-        <label for="editGroup">Group size <span class="opt">(optional)</span></label>
-        <input type="number" id="editGroup" inputmode="numeric" min="1" max="999" step="1" placeholder="4">
+        <label id="editGroupLabel">Estimated average group size</label>
+        <div class="chip-row size-choices" id="editGroupChips" role="radiogroup" aria-labelledby="editGroupLabel">
+          <button type="button" class="chip" data-chip="2">2</button>
+          <button type="button" class="chip" data-chip="3">3</button>
+          <button type="button" class="chip" data-chip="4">4</button>
+          <button type="button" class="chip" data-chip="5">5</button>
+          <button type="button" class="chip" data-chip="6">6</button>
+          <button type="button" class="chip" data-chip="7">7</button>
+          <button type="button" class="chip" data-chip="8">8</button>
+        </div>
       </div>
       <div class="field hidden" id="editAvgWrap">
         <label>CAT group size avg estimate <span class="opt">(optional)</span></label>
