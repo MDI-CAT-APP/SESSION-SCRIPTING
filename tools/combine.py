@@ -183,7 +183,7 @@ def _rows_from_reader(reader: csv.DictReader) -> list[dict[str, str]]:
     if not reader.fieldnames:
         raise ValueError("missing header")
     headers = {norm_header(name) for name in reader.fieldnames}
-    # Older exports may include closing_mixed. It is not required and is ignored.
+    # Older exports may include closing_mixed. conversation_topic_task may be present or absent. Neither is required.
     if not REQUIRED.issubset(headers) or not ({"group_size", "group_size_avg"} & headers):
         raise ValueError("not a Session Script export")
     rows: list[dict[str, str]] = []

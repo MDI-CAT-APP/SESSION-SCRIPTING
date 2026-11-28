@@ -51,7 +51,8 @@
     "duration_seconds",
     "group_size",
     "group_size_avg",
-    "note"
+    "note",
+    "conversation_topic_task"
   ];
 
   var LEGACY_TYPES = {
@@ -535,7 +536,8 @@
         secs == null ? "" : String(secs),
         seg.groupSize == null ? "" : String(seg.groupSize),
         csvCell(csvGroupAvg(seg)),
-        csvCell(exportNoteText(seg))
+        csvCell(exportNoteText(seg)),
+        csvCell(seg.type === "Conversation" ? (seg.conversationTopic || "") : "")
       ].join(","));
     });
     return lines.join("\r\n") + "\r\n";
@@ -548,6 +550,11 @@
     if (!seg.end) return start + " (running) " + label + extra;
     var secs = segmentSeconds(seg);
     return start + "–" + formatHMS(new Date(seg.end)) + " (" + formatSeconds(secs) + ") " + label + extra;
+  }
+
+  function topicLine(seg) {
+    var topic = seg && seg.type === "Conversation" ? String(seg.conversationTopic || "").trim() : "";
+    return topic ? "Topic or task: " + topic : "";
   }
 
   function snapLeftPct(value) {
@@ -616,6 +623,7 @@
     } else {
       segs.forEach(function (seg) {
         lines.push(segmentScriptLine(seg));
+        if (topicLine(seg)) lines.push("  " + topicLine(seg));
         if ((seg.note || "").trim()) lines.push("  " + seg.note.trim());
       });
     }
@@ -664,9 +672,11 @@
       start: raw.start,
       end: raw.end || null,
       note: raw.note || "",
+      conversationTopic: "",
       groupSize: null,
       groupSizeAvg: ""
     };
+    if (type === "Conversation") segment.conversationTopic = String(raw.conversationTopic || "");
     if (avg === "plenary") {
       segment.groupSizeAvg = "plenary";
     } else if (avg) {
@@ -967,6 +977,7 @@
       start: iso,
       end: null,
       note: extra.note || "",
+      conversationTopic: "",
       groupSize: groupSizeAvg === "plenary" ? null : groupSize,
       groupSizeAvg: groupSizeAvg
     });
@@ -1596,6 +1607,9 @@
     var note = (seg.note || "").trim().replace(/\s+/g, " ");
     if (note.length > 24) note = note.slice(0, 23).trim() + "…";
     if (note) bits.push(note);
+    var topic = topicLine(seg).replace(/\s+/g, " ");
+    if (topic.length > 36) topic = topic.slice(0, 35).trim() + "…";
+    if (topic) bits.push(topic);
     return bits.length ? " · " + bits.join(" · ") : "";
   }
 
@@ -1671,6 +1685,57 @@
         liveSessionTouch();
       });
     }
+    var chips = $("runGroupChips");
+    if (chips && seg && seg.type === "Conversation") {
+      var preset = seg.groupSize != null && seg.groupSize >= 2 && seg.groupSize <= 8 ? String(seg.groupSize) : "";
+      setChips("runGroupChips", preset);
+      bindChipRow("runGroupChips");
+      chips.addEventListener("click", function () {
+        var live = runningSegment(currentSession());
+        if (!live || live.type !== "Conversation") return;
+        applyGroupAvg(live, readGroupAvg("runGroupChips"));
+        liveSessionTouch();
+        render();
+      });
+    }
+    var topic = $("runTopic");
+    if (topic && seg && seg.type === "Conversation") {
+      topic.value = seg.conversationTopic || "";
+      topic.addEventListener("input", function () {
+        var live = runningSegment(currentSession());
+        if (!live || live.type !== "Conversation") return;
+        live.conversationTopic = topic.value;
+        liveSessionTouch();
+        render();
+      });
+      topic.addEventListener("focus", function () {
+        topic.classList.add("grown");
+        revealRunTopic();
+      });
+      topic.addEventListener("blur", function () {
+        topic.classList.remove("grown");
+        var live = runningSegment(currentSession());
+        if (!live || live.type !== "Conversation") return;
+        live.conversationTopic = topic.value.trim();
+        topic.value = live.conversationTopic;
+        liveSessionTouch();
+      });
+    }
+  }
+
+  function revealRunTopic() {
+    var area = $("runTopic");
+    if (!area || document.activeElement !== area) return;
+    var vv = window.visualViewport;
+    if (vv) {
+      var rect = area.getBoundingClientRect();
+      var visibleBottom = vv.offsetTop + vv.height - 12;
+      if (rect.bottom > visibleBottom || rect.top < vv.offsetTop + 8) {
+        try { area.scrollIntoView({ block: "center", inline: "nearest" }); } catch (e) { area.scrollIntoView(false); }
+      }
+    } else {
+      try { area.scrollIntoView({ block: "center" }); } catch (e2) { /* ignore */ }
+    }
   }
 
   function liveSessionTouch() {
@@ -1700,8 +1765,26 @@
       bindRunning(null);
       return;
     }
-    var groupLine = groupPlain(seg);
+    var groupLine = seg.type === "Conversation" ? "" : groupPlain(seg);
     var groupField = groupLine ? '<p class="run-group">' + escapeHtml(groupLine) + "</p>" : "";
+    var catFields = "";
+    if (seg.type === "Conversation") {
+      catFields =
+        '<div class="run-cat">' +
+          '<label id="runGroupLabel">Estimated average group size</label>' +
+          '<div class="chip-row size-choices" id="runGroupChips" role="radiogroup" aria-labelledby="runGroupLabel">' +
+            '<button type="button" class="chip" data-chip="2">2</button>' +
+            '<button type="button" class="chip" data-chip="3">3</button>' +
+            '<button type="button" class="chip" data-chip="4">4</button>' +
+            '<button type="button" class="chip" data-chip="5">5</button>' +
+            '<button type="button" class="chip" data-chip="6">6</button>' +
+            '<button type="button" class="chip" data-chip="7">7</button>' +
+            '<button type="button" class="chip" data-chip="8">8</button>' +
+          "</div>" +
+          '<label for="runTopic">Topic or task for conversation</label>' +
+          '<textarea id="runTopic" rows="1" placeholder="Specific instructions given for these conversations"></textarea>' +
+        "</div>";
+    }
     card.innerHTML =
       '<p class="run-kicker"><span class="run-dot" aria-hidden="true"></span><span class="run-kicker-label">Running:</span><span class="run-kicker-name">' + escapeHtml(segmentLabel(seg)) + "</span></p>" +
       '<div class="run-clock-row">' +
@@ -1711,6 +1794,7 @@
           '<button type="button" class="undo-btn" id="undoBtn">Undo last tap</button>' +
         "</div>" +
       "</div>" +
+      catFields +
       groupField;
     bindRunning(seg);
   }
@@ -1922,10 +2006,12 @@
     $("editType").value = seg.type;
     $("editOther").value = seg.otherLabel || "";
     markOtherQuick("editQuick", seg.otherLabel || "");
-    var otherSize = seg.type === "Other activity" ? seg.groupSize : null;
+    var otherSize = seg.type === "Other activity" || seg.type === "Conversation" ? seg.groupSize : null;
     var otherPreset = otherSize != null && otherSize >= 2 && otherSize <= 8 ? String(otherSize) : "";
     setChips("editGroupChips", otherPreset);
-    editOtherGroupKept = otherPreset || otherSize == null ? null : String(otherSize);
+    if ((seg.type === "Other activity" || seg.type === "Conversation") && seg.groupSizeAvg === "plenary") editOtherGroupKept = "plenary";
+    else editOtherGroupKept = otherPreset || otherSize == null ? null : String(otherSize);
+    if ($("editTopic")) $("editTopic").value = seg.type === "Conversation" ? (seg.conversationTopic || "") : "";
     showGroupAvg("editChips", seg.type === "Conversation" ? (seg.groupSizeAvg || "") : "");
     $("editNote").value = seg.note || "";
     $("editStart").textContent = formatHMS(new Date(seg.start));
@@ -1937,8 +2023,9 @@
   function toggleEditFields() {
     var type = $("editType").value;
     $("editOtherWrap").classList.toggle("hidden", type !== "Other activity");
-    $("editGroupWrap").classList.toggle("hidden", type !== "Other activity");
-    $("editAvgWrap").classList.toggle("hidden", type !== "Conversation");
+    $("editGroupWrap").classList.toggle("hidden", type !== "Other activity" && type !== "Conversation");
+    $("editAvgWrap").classList.add("hidden");
+    if ($("editTopicWrap")) $("editTopicWrap").classList.toggle("hidden", type !== "Conversation");
   }
 
   function saveEdit() {
@@ -1958,9 +2045,9 @@
     }
     seg.type = type;
     seg.otherLabel = otherLabel;
-    if (type === "Conversation") commitGroupAvg(seg, "editChips");
-    else if (type === "Other activity") applyGroupAvg(seg, readGroupAvg("editGroupChips") || editOtherGroupKept || "");
+    if (type === "Conversation" || type === "Other activity") applyGroupAvg(seg, readGroupAvg("editGroupChips") || editOtherGroupKept || "");
     else applyGroupAvg(seg, "");
+    seg.conversationTopic = type === "Conversation" && $("editTopic") ? $("editTopic").value.trim() : "";
     seg.note = $("editNote").value.trim();
     if (session.status === "ended") session.dirtyExport = true;
     session.updatedAt = new Date().toISOString();
@@ -2218,6 +2305,7 @@
 
     $("emailMaartenBtn").addEventListener("click", function () { emailToMaarten(currentSession()); });
     $("shareBtn").addEventListener("click", function () { shareReport(currentSession()); });
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", revealRunTopic);
     $("editSessionBtn").addEventListener("click", openSessionSetup);
     $("setupEditCancel").addEventListener("click", function () { closeModal("setupEditModal"); });
     $("setupEditSave").addEventListener("click", saveSessionSetup);

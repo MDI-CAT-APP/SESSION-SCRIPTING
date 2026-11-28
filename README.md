@@ -22,7 +22,7 @@ A second tap on the same activity within 2 seconds is ignored. **Undo last tap**
 
 **Edit** on a line can change the activity, the note, and the group size. **Delete line** asks you to confirm, then removes that line and keeps the timeline continuous: the previous line extends to the next line’s start. If you delete the line that is still running, the previous line is running again.
 
-Conversations (CAT) has **CAT group size avg estimate**: 2, 3, 4, 5, or 6. Older logs can still carry another number or plenary, and those values stay in the exports. Other activity has an optional **Estimated average group size**: 2, 3, 4, 5, 6, 7, or 8.
+Conversations (CAT) has **CAT group size avg estimate**: 2, 3, 4, 5, or 6 on the note sheet. While it is running, the card also has **Estimated average group size** (2–8) and an optional **Topic or task for conversation**. Older logs can still carry another number or plenary, and those values stay in the exports. Other activity has the same optional group-size choices: 2, 3, 4, 5, 6, 7, or 8.
 
 The log is saved on the phone as you go. Reloading the page does not clear it.
 
@@ -91,6 +91,7 @@ Every observer's CSV uses the same header, so files from several rooms can be st
 | group_size | Empty, or a whole number. Empty when the group size avg is plenary |
 | group_size_avg | Empty, a whole number, or `plenary` (the whole room) |
 | note | Optional note. For Other activity this is the description, then ` - `, then the note |
+| conversation_topic_task | Optional topic or task for a Conversations (CAT) line. Empty on other rows. Older files may omit this column |
 
 The file is UTF-8 with a byte order mark so Excel opens the text correctly.
 
