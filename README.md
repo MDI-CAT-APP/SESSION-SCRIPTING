@@ -8,7 +8,7 @@ Up to four observers can each keep their own log. Nothing is uploaded by itself.
 
 Open `index.html` on the phone, or run the optional server below and open that address.
 
-1. Enter the **session title**, **speaker name(s)** (one per line), the **room name**, the **planned start** (date and time), **your name**, and, if you know it, the **estimated nr of participants**.
+1. Enter the **session title**, **speaker name(s)** (one per line), the **room name**, the **planned session start** (date and time), **your name**, and, if you know it, the **estimated nr of participants**.
 2. Tap **Next**. That opens the activity screen and does not start the clock.
 3. Tap an activity to start timing. That first tap is the actual start, and the first activity begins then. Each later tap ends the activity that was running and starts the next one.
 
